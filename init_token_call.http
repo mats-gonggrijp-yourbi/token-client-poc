@@ -1,0 +1,5 @@
+POST http://127.0.0.1:8000/token
+Content-Type: application/x-www-form-urlencoded
+Authorization: Basic Y2xpZW50MTIzOnNlY3JldDEyMw==
+
+grant_type=password&username=test&password=123
