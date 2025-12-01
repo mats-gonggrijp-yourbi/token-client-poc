@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = ["fastapi", "uvicorn", "python-multipart"]
+dependencies = [
+    "fastapi", "uvicorn", "python-multipart", "psycopg[binary]", "dotenv"
+]
 [dependency-groups]
 dev = [
     "jupyter",

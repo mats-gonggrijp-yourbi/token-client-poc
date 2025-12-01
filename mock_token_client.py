@@ -36,7 +36,7 @@ def issue_token_pair() -> dict[str, str | int]:
         "access_token": access,
         "refresh_token": refresh,
         "token_type": "bearer",
-        "expires_in": 3600,
+        "expires_in": 5,
     }
 
 def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
@@ -62,11 +62,12 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    expires_in: int = 3600
+    expires_in: int = 5
 
 # ------------------------------------------------------------------------------
 # OAuth2.0 Token Endpoint
 # ------------------------------------------------------------------------------
+# 
 @app.post("/token", response_model=TokenResponse)
 async def token(
     grant_type: str = Form(...),
