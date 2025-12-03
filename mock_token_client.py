@@ -4,10 +4,11 @@ from pydantic import BaseModel
 from typing import Optional
 import time
 import secrets
+from constants import EXPIRES_IN
 
 app = FastAPI(title="Mock OAuth2.0 Server")
-
 security = HTTPBasic()
+app.state.last_issued = time.monotonic()
 
 # ------------------------------------------------------------------------------
 # Configuration: Provider-like variations
@@ -32,11 +33,12 @@ def issue_token_pair() -> dict[str, str | int]:
     access = generate_token("access")
     refresh = generate_token("refresh")
     VALID_REFRESH_TOKENS.add(refresh)
+    app.state.last_issued = time.monotonic()
     return {
         "access_token": access,
         "refresh_token": refresh,
         "token_type": "bearer",
-        "expires_in": 5,
+        "expires_in": EXPIRES_IN,
     }
 
 def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
@@ -62,7 +64,7 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    expires_in: int = 5
+    expires_in: int = EXPIRES_IN
 
 # ------------------------------------------------------------------------------
 # OAuth2.0 Token Endpoint
@@ -107,6 +109,11 @@ async def token(
     # 2. REFRESH TOKEN FLOW (grant_type=refresh_token)
     # ------------------------------------------------------------------
     if grant_type == "refresh_token":
+        now = time.monotonic()
+        diff = now - app.state.last_issued
+        if diff > EXPIRES_IN:
+            print(f"TOO LATE!")
+
         if not refresh_token:
             raise HTTPException(status_code=400, detail="Missing refresh_token")
         if refresh_token not in VALID_REFRESH_TOKENS:

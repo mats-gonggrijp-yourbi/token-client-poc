@@ -1,5 +1,5 @@
 import psycopg
-from config import CONFIG 
+from constants import CONFIG 
 import os
 from typing import Any
 import json
