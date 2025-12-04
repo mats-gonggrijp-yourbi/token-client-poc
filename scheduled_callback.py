@@ -1,28 +1,30 @@
-from typing import Callable, Coroutine, Any
-from httpx import Response
-from dataclasses import dataclass
 import httpx
+from  httpx import Response
+from auth_config import AuthConfig
+import re
 
-@dataclass
 class ScheduledCallback:
-    callback: Callable[
-        [str, dict[str, str], dict[str, Any]], # args
-        Coroutine[Any, Any, Response] # output
-    ]
-    args: dict[str, Any]
-    deadline_tick: int
-    ticks_to_deadline: int
+    def __init__(
+        self, auth_config: AuthConfig, scheduled_tick: int
+    ):
+        self.auth_config = auth_config
+        self.scheduled_tick = scheduled_tick
 
-async def callback(
-    url: str,
-    headers: dict[str, str],
-    body: dict[str, Any]
-) -> Response:
-    async with httpx.AsyncClient() as client:
-        if headers["Content-Type"] == 'application/json':
-            return await client.post(url, headers=headers, json=body)
-    
-        elif headers["Content-Type"] == 'application/x-www-form-urlencoded':
-            return await client.post(url, headers=headers, data=body)
+    async def callback(self) -> Response:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url=self.auth_config.url,
+                headers=self.auth_config.headers,
+                content=self.auth_config.body
+            )
 
-        raise RuntimeError
+            if response:
+                data = response.json()
+                self.auth_config.body = re.sub(
+                    pattern=r"refresh_token=[^&]*",
+                    repl=f"refresh_token={data["refresh_token"]}",
+                    string=self.auth_config.body
+                )
+                # TO DO: put the access token in the key-vault
+                # data['access_token'] -> customer keyvault
+            return response

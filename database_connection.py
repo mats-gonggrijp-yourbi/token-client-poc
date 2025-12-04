@@ -1,43 +1,27 @@
 import psycopg
-from constants import CONFIG 
 import os
-from typing import Any
-import json
-from urllib.parse import parse_qsl
+from auth_config import AuthConfig
 import dotenv
 dotenv.load_dotenv(".env")
 
-conn = psycopg.connect((
-    f"postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}"
-    "@localhost:5432/postgres"
-))
+columns = [
+    "id", "url", "headers", "body", "expires_in",
+    "module_alias", "system_alias", "customer_alias", "instance_alias"
+]
 
-# Load the config for each token refresh
-with conn.cursor() as cur:
-    cur.execute("SELECT * FROM auth.config")
-    rows = cur.fetchall()
-    for r in rows:
-        # Last 4 columns: module, system, customer, instance
-        composite_id = "/".join(r[len(r) - 4 :])
+def load_config_from_database():
+    conn = psycopg.connect(
+        f"postgresql://{os.getenv("POSTGRES_USER")}:{os.getenv("POSTGRES_PASSWORD")}@localhost:5432/postgres",
+    )
 
-        # First: id, url, type, method, headers, body, expires_in
-        data: dict[str, Any] = {
-            "id" : r[0],
-            "url" : r[1],
-            "type" : r[2],
-            "method" : r[3],
-            "headers" : json.loads(r[4]),
-            "expires_in" : r[6]
-        }
+    # Load configs
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM auth.config")
+        rows = cur.fetchall()
+        configs: list[AuthConfig] = [
+            AuthConfig.model_validate(dict(zip(columns, row)))
+            for row in rows
+        ]
 
-        content_type: str = data["headers"]["Content-Type"] 
-        if content_type == "application/json":
-            data["body"] = json.loads(r[5])
+    return configs
 
-        elif content_type == "application/x-www-form-urlencoded":
-            data["body"] = dict(parse_qsl(r[5]))
-
-        # Shared global state for token config
-        CONFIG[composite_id] = data
-
-print(CONFIG)

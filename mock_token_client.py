@@ -1,130 +1,51 @@
-from fastapi import FastAPI, Form, Header, HTTPException, Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import BaseModel
-from typing import Optional
-import time
-import secrets
-from constants import EXPIRES_IN
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+import secrets, time
+from typing import Any
+from starlette.datastructures import FormData
+import asyncio
 
-app = FastAPI(title="Mock OAuth2.0 Server")
-security = HTTPBasic()
-app.state.last_issued = time.monotonic()
+app = FastAPI()
+refresh_store: dict[str, dict[Any, Any]] = {}
 
-# ------------------------------------------------------------------------------
-# Configuration: Provider-like variations
-# ------------------------------------------------------------------------------
-ENABLE_BASIC_AUTH = True  # Toggle Basic Auth requirement
-EXPECTED_CLIENT_ID = "client123"
-EXPECTED_CLIENT_SECRET = "secret123"
+def parse_body(data: dict[Any, Any] | FormData) -> dict[Any, Any]:
+    if isinstance(data, dict):
+        return data
+    return dict(data)
 
-# These could come from a DB or memory. Here we keep it simple.
-VALID_REFRESH_TOKENS: set[str] = set()
+def issue_tokens(owner: str) -> dict[str, str | int]:
+    access = secrets.token_hex(16)
+    refresh = secrets.token_hex(32)
+    refresh_store[refresh] = {"owner": owner, "issued_at": time.time(), "access_exp": time.time() + 30}
+    return {"access_token": access, "refresh_token": refresh, "token_type": "bearer", "expires_in": 30}
 
-# ------------------------------------------------------------------------------
-# Helper functions (OAuth2.0 core logic)
-# ------------------------------------------------------------------------------
+@app.post("/token")
+async def token(req: Request):
+    # Mimick realistic server response times 
+    await asyncio.sleep(0.08) # 80ms
 
-def generate_token(prefix: str) -> str:
-    """Generate a simple unique token."""
-    return f"{prefix}-{int(time.time())}-{secrets.token_hex(8)}"
+    body = await req.json() if req.headers.get("Content-Type","").startswith("application/json") else await req.form()
+    body_dict: dict[Any, Any] = parse_body(body)
+    grant_type = body_dict.get("grant_type")
 
-def issue_token_pair() -> dict[str, str | int]:
-    """Create a new access + refresh token pair."""
-    access = generate_token("access")
-    refresh = generate_token("refresh")
-    VALID_REFRESH_TOKENS.add(refresh)
-    app.state.last_issued = time.monotonic()
-    return {
-        "access_token": access,
-        "refresh_token": refresh,
-        "token_type": "bearer",
-        "expires_in": EXPIRES_IN,
-    }
+    if grant_type not in ("client_credentials","refresh_token"):
+        raise HTTPException(400, "unsupported grant_type")
 
-def validate_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
-    """
-    Optional provider-specific feature:
-    Validate client_id + client_secret using HTTP Basic Auth.
+    if grant_type == "client_credentials":
+        if not body_dict.get("client_id") or not body_dict.get("client_secret"):
+            raise HTTPException(400,"invalid client credentials")
+        owner = body_dict["client_id"]
+        return JSONResponse(issue_tokens(owner))
 
-    This is NOT required by OAuth2.0 core spec, but widely used by many providers.
-    """
-    if not ENABLE_BASIC_AUTH:
-        return
-
-    correct_id = secrets.compare_digest(credentials.username, EXPECTED_CLIENT_ID)
-    correct_secret = secrets.compare_digest(credentials.password, EXPECTED_CLIENT_SECRET)
-
-    if not (correct_id and correct_secret):
-        raise HTTPException(status_code=401, detail="Invalid client credentials")
-
-# ------------------------------------------------------------------------------
-# Models (response objects)
-# ------------------------------------------------------------------------------
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int = EXPIRES_IN
-
-# ------------------------------------------------------------------------------
-# OAuth2.0 Token Endpoint
-# ------------------------------------------------------------------------------
-# 
-@app.post("/token", response_model=TokenResponse)
-async def token(
-    grant_type: str = Form(...),
-    username: Optional[str] = Form(None),       # used for "password" grant
-    password: Optional[str] = Form(None),       # used for "password" grant
-    refresh_token: Optional[str] = Form(None),  # used for refresh flow
-    client_id: Optional[str] = Form(None),      # optional depending on provider
-    client_secret: Optional[str] = Form(None),  # optional depending on provider
-    authorization: Optional[str] = Header(None),
-    credentials: Optional[HTTPBasicCredentials] = Depends(validate_basic_auth),
-):
-    """
-    This endpoint mimics /token behavior found in OAuth2.0 providers.
-    
-    Supported grant types:
-    - "password": simulate initial sign-in → access + refresh tokens
-    - "refresh_token": simulate token refresh → new access + refresh tokens
-
-    Provider-specific behaviors:
-    - May require HTTP Basic Auth (enabled via ENABLE_BASIC_AUTH)
-    - May require client_id/client_secret inside body instead of headers
-    """
-
-    # ------------------------------------------------------------------
-    # 1. INITIAL USER SIGN-IN (grant_type=password)
-    # ------------------------------------------------------------------
-    if grant_type == "password":
-        # -- Provider-specific behavior:
-        # Some providers validate username/password here.
-        # This mock simply checks if provided at all.
-        if not username or not password:
-            raise HTTPException(status_code=400, detail="Missing username or password")
-
-        return issue_token_pair()
-
-    # ------------------------------------------------------------------
-    # 2. REFRESH TOKEN FLOW (grant_type=refresh_token)
-    # ------------------------------------------------------------------
     if grant_type == "refresh_token":
-        now = time.monotonic()
-        diff = now - app.state.last_issued
-        if diff > EXPIRES_IN:
-            print(f"TOO LATE!")
+        r = body_dict.get("refresh_token")
+        if r not in refresh_store:
+            raise HTTPException(400,"invalid refresh_token")
+        info = refresh_store.pop(r)
+        if time.time() > info["access_exp"]:
+            print(f"refresh used after expiry by {info['owner']}")
+        return JSONResponse(issue_tokens(info["owner"]))
 
-        if not refresh_token:
-            raise HTTPException(status_code=400, detail="Missing refresh_token")
-        if refresh_token not in VALID_REFRESH_TOKENS:
-            raise HTTPException(status_code=400, detail="Invalid refresh_token")
-
-        # Invalidate old refresh token (provider preference)
-        VALID_REFRESH_TOKENS.discard(refresh_token)
-
-        return issue_token_pair()
-
-    # ------------------------------------------------------------------
-    # Unsupported grant type
-    # ------------------------------------------------------------------
-    raise HTTPException(status_code=400, detail="Unsupported grant_type")
+@app.get("/")
+def root():
+    return {"status": "ok"}
