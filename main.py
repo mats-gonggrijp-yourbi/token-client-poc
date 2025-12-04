@@ -1,16 +1,24 @@
 import asyncio
 import time
-from constants import *
 from scheduled_callback import ScheduledCallback
-from global_variables import wheel, queue
 from database_connection import load_config_from_database
 import httpx
-import re
+from typing import Any
+from urllib.parse import parse_qsl, urlencode
+import json
+
+TIME_WHEEL_SIZE = 32
+TIME_MARGIN = 3
+NUM_WORKERS = 1
+SECONDS_PER_TICK = 2.0
+
+time_wheel: list[list[ScheduledCallback]] = [[] for _ in range(TIME_WHEEL_SIZE)] 
+callback_queue: asyncio.Queue[ScheduledCallback] = asyncio.Queue()
 
 async def worker():
     """ Execute sheduled callbacks from queue and reschedule new ones in wheel. """
     while True:
-        sc = await queue.get()
+        sc = await callback_queue.get()
         print((
             f"Executing for: {sc.auth_config.customer_alias} "
             f"with deadline: {sc.scheduled_tick}"
@@ -28,28 +36,29 @@ async def worker():
             sc.scheduled_tick = new_scheduled_tick
 
             # Add the scheduled callback to the wheel again
-            wheel[new_scheduled_tick].append(sc) 
+            time_wheel[new_scheduled_tick].append(sc) 
 
             print(f"Scheduled new callback for tick {new_scheduled_tick}")
 
         finally:
-            queue.task_done()
+            callback_queue.task_done()
 
-# All data that the callback needs to refresh a token
+
 async def queue_wheel_slot(t: int):
-        if wheel[t]:
-            print(f"Queueing {len(wheel[t])} callbacks..")
-        for sc in wheel[t]:
-            await queue.put(sc)
-        wheel[t] = []
+        if time_wheel[t]:
+            print(f"Queueing {len(time_wheel[t])} callbacks..")
+        for sc in time_wheel[t]:
+            await callback_queue.put(sc)
+        time_wheel[t] = []
+
 
 async def tick_loop():
     """ Move scheduled callbacks from wheel onto queue. """
     t = 0
-    next_tick_time = time.monotonic() + TICK_INTERVAL
+    next_tick_time = time.monotonic() + SECONDS_PER_TICK
 
     while True:
-        print(f'\n--- tick {t} ---')
+        print(f'\n--- tick {t} ({t * SECONDS_PER_TICK} seconds)---')
         await queue_wheel_slot(t)
 
         now = time.monotonic()
@@ -58,10 +67,8 @@ async def tick_loop():
             await asyncio.sleep(diff)
 
         t = (t + 1) %  TIME_WHEEL_SIZE
-        next_tick_time += TICK_INTERVAL
+        next_tick_time += SECONDS_PER_TICK
 
-
-# For testing
 async def initial_call(url: str, client_id: str) -> dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     body = f'''
@@ -77,14 +84,26 @@ async def initial_call(url: str, client_id: str) -> dict[str, Any]:
             headers=headers,
             content=body
         )
+
     return response.json()
+
+
+async def update_client_credentials(
+        body: dict[str, str],
+        scheduled_callback: ScheduledCallback
+    ):
+    # Add client ID and secret if they are necessary
+    if "client_id" in body:
+        body["client_id"] = await scheduled_callback.secret_client.get_secret("ClientId")
+    if "client_secret" in body:
+        body["client_secret"] = await scheduled_callback.secret_client.get_secret("ClientId")
 
 
 async def main():
     for _ in range(NUM_WORKERS):
         asyncio.create_task(worker())
 
-    # Enque an initial callback to start the process
+    # Configs per callback are stored in the database
     configs = load_config_from_database()
 
     # Create a scheduled callback for each config
@@ -92,14 +111,40 @@ async def main():
         scheduled_tick = c.expires_in - TIME_MARGIN
         print(f"Scheduling for: {c.customer_alias}")
         sc = ScheduledCallback(c, scheduled_tick)
-        # Use customer alias as client_id for tracking
+
+        # Get initial refresh token from auth server (this would be manual)
         data = await initial_call(sc.auth_config.url, sc.auth_config.customer_alias)
-        sc.auth_config.body = re.sub(
-            pattern=r"refresh_token=[^&]*",
-            repl=f"refresh_token={data["refresh_token"]}",
-            string=sc.auth_config.body
-        )
-        wheel[scheduled_tick].append(sc) 
+        rt = data["refresh_token"]
+        at = data["access_token"]
+
+        ctype = c.headers["Content-Type"]
+        if ctype == "application/x-www-form-urlencoded":
+            body = dict(parse_qsl(c.body))
+            await update_client_credentials(body, sc)
+            body['refresh_token'] = rt
+            c.body = urlencode(body)
+
+        elif ctype == "application/json":
+            body = json.loads(c.body)
+            await update_client_credentials(body, sc)
+            body['refresh_token'] = rt
+            c.body = json.dumps(body)
+        
+        else:
+            raise RuntimeError(
+                "Content-Type must be either json or x-www-url-form-encoded"
+            )
+        
+        # Set the refresh and access tokens in the customer's keyvault
+        await sc.secret_client.update_secret("RefreshToken", rt)
+        await sc.secret_client.update_secret("AccessToken", at)
+
+        print(sc.auth_config.body)
+
+        # Schedule the callback 
+        time_wheel[scheduled_tick].append(sc) 
+
+    print(f"Loaded {len(configs)} configs")
 
     await tick_loop()
 

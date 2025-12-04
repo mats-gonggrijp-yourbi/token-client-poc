@@ -5,7 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "fastapi", "uvicorn", "python-multipart", "psycopg[binary]", "dotenv"
+    "fastapi", "uvicorn", "python-multipart", "psycopg[binary]", "dotenv", 
+    "azure-keyvault-secrets", "azure-identity", "aiohttp"
 ]
 [dependency-groups]
 dev = [
