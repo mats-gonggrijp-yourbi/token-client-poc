@@ -48,8 +48,7 @@ async def increment_tick(t: int, next_tick_time: float):
     diff = next_tick_time - now
     if diff > 0:
         await asyncio.sleep(diff)
-    t = (t + 1) %  TIME_WHEEL_SIZE
-    next_tick_time += SECONDS_PER_TICK
+    return next_tick_time + SECONDS_PER_TICK
 
 
 async def tick_loop():
@@ -64,7 +63,8 @@ async def tick_loop():
         await queue_slot(t)
 
         # Increment tick by sleeping untill next time interval
-        await increment_tick(t, next_tick_time)
+        next_tick_time = await increment_tick(t, next_tick_time)
+        t = (t + 1) %  TIME_WHEEL_SIZE
 
 
 async def main():

@@ -1,0 +1,12 @@
+-- 5/12/2025 --
+NOTE: system breaks when time of work (TOW) per slot exceeds the SECONDS_PER_TICK.
+
+Emptying the callback queue MUST finish before the current tick is over -> HARD REQUIREMENT
+
+TTW/slot is determined almost completely by the update_time(secret) X num(calls)/slot.
+
+Seconds per tick must accomodate TOW/slot, otherwise rescheduling of calls could occur
+during the same tick. 
+
+I should experiment with the SECONDS_PER_TICK and NUM_WORKER to increase system capacity.
+----
