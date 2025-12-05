@@ -2,7 +2,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 from ast import literal_eval
 
-class AuthConfig(BaseModel):
+class CallbackConfig(BaseModel):
     id: Optional[int] = Field(default=None)  
     url: str
     headers: dict[str, str]

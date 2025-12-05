@@ -8,6 +8,8 @@ import asyncio
 app = FastAPI()
 refresh_store: dict[str, dict[Any, Any]] = {}
 
+RESPONSE_TIME = 0.08
+
 def parse_body(data: dict[Any, Any] | FormData) -> dict[Any, Any]:
     if isinstance(data, dict):
         return data
@@ -22,7 +24,7 @@ def issue_tokens(owner: str) -> dict[str, str | int]:
 @app.post("/token")
 async def token(req: Request):
     # Mimick realistic server response times 
-    await asyncio.sleep(0.08) # 80ms
+    await asyncio.sleep(RESPONSE_TIME) # 80ms
 
     body = await req.json() if req.headers.get("Content-Type","").startswith("application/json") else await req.form()
     body_dict: dict[Any, Any] = parse_body(body)
@@ -42,8 +44,8 @@ async def token(req: Request):
         if r not in refresh_store:
             raise HTTPException(400,"invalid refresh_token")
         info = refresh_store.pop(r)
-        if time.time() > info["access_exp"]:
-            print(f"refresh used after expiry by {info['owner']}")
+        # if time.time() > info["access_exp"]:
+        #     print(f"refresh used after expiry by {info['owner']}")
         return JSONResponse(issue_tokens(info["owner"]))
 
 @app.get("/")

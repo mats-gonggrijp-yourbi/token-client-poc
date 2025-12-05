@@ -1,6 +1,6 @@
 import psycopg
 import os
-from auth_config import AuthConfig
+from callback_config import CallbackConfig
 import dotenv
 dotenv.load_dotenv(".env")
 
@@ -18,8 +18,8 @@ def load_config_from_database():
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM auth.config")
         rows = cur.fetchall()
-        configs: list[AuthConfig] = [
-            AuthConfig.model_validate(dict(zip(columns, row)))
+        configs: list[CallbackConfig] = [
+            CallbackConfig.model_validate(dict(zip(columns, row)))
             for row in rows
         ]
 
