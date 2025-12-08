@@ -1,7 +1,7 @@
 import asyncio
 
 # Typical azure keyvault response times
-WAIT_TIME = 1.0
+WAIT_TIME = 0.0
 
 # TO DO: when wait time on external services is too large it breaks everything 
 #   -> need safe margins and failure mitigation tactics

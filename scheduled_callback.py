@@ -19,9 +19,9 @@ def update_json(data: str, key: str, value: Any):
 
 class ScheduledCallback:
     def __init__(
-        self, auth_config: CallbackConfig, scheduled_tick: int = 0
+        self, config: CallbackConfig, scheduled_tick: int = 0
     ):
-        self.config = auth_config
+        self.config = config
         self.scheduled_tick = scheduled_tick
         self.secret_client = MockSecretClient()
 
