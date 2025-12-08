@@ -1,5 +1,7 @@
 from typing import Any
 
+MIN_WAIT_TIME = 1 # to do: per system from config 
+ 
 class TimeWheel:
     def __init__(self, size: int) -> None:
         self.slots: list[list[Any]] = [[] for _ in range(size)]
@@ -16,7 +18,7 @@ class TimeWheel:
         assert deadline - safety_margin > 0
         
         max_offset  = deadline - safety_margin
-        allowed = [(current_tick + i) % self.size for i in range(1, max_offset + 1)]
+        allowed = [(current_tick + i) % self.size for i in range(MIN_WAIT_TIME, max_offset + 1)]
         optimal = min(allowed, key=lambda t: (len(self.slots[t]), t))
         self.slots[optimal].append(item)
 

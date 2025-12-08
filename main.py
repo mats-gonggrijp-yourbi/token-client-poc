@@ -8,8 +8,8 @@ from init_call import initial_call
 # Constants
 TIME_WHEEL_SIZE = 30
 TIME_MARGIN = 1
-NUM_WORKERS = 1
-SECONDS_PER_TICK = 5.0
+NUM_WORKERS = 100
+SECONDS_PER_TICK = 1.0
 
 # Global variables
 timewheel = TimeWheel(TIME_WHEEL_SIZE) 
@@ -21,10 +21,7 @@ async def worker():
         sc = await callback_queue.get()
         try:
             # Update the fresh and access tokens 
-            data = await sc.callback()
-            if data:
-                await sc.secret_client.set_secret("RefreshToken", data["refresh_token"])
-                await sc.secret_client.set_secret("AccessToken", data["access_token"])
+            await sc.callback()
 
             # Add the scheduled callback to the wheel again
             sc.scheduled_tick = timewheel.add(

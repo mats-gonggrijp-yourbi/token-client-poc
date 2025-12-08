@@ -31,7 +31,7 @@ class ScheduledCallback:
         else:
             self.update_fn = update_json
 
-    async def callback(self) -> dict[str, Any] | None:
+    async def callback(self) -> None:
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 url=self.config.url,
@@ -47,7 +47,8 @@ class ScheduledCallback:
                 self.config.body = self.update_fn(
                     self.config.body, "refresh_token", rt
                 )
+                await self.secret_client.set_secret("RefreshToken", data["refresh_token"])
+                await self.secret_client.set_secret("AccessToken", data["access_token"])
 
-                return data
-            
+            return None            
 
