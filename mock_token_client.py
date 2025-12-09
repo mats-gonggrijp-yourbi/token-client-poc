@@ -7,6 +7,7 @@ import asyncio
 
 app = FastAPI()
 refresh_store: dict[str, dict[Any, Any]] = {}
+timeout_check: dict[str, float] = {}
 
 RESPONSE_TIME = 0.08
 
@@ -29,6 +30,28 @@ async def token(req: Request):
     body = await req.json() if req.headers.get("Content-Type","").startswith("application/json") else await req.form()
     body_dict: dict[Any, Any] = parse_body(body)
     grant_type = body_dict.get("grant_type")
+
+    call_id: str | None = req.headers.get("id", None)
+    if not call_id:
+        raise HTTPException(500)
+
+    curr_time = time.monotonic()
+    exp_time = int(req.headers.get("expires_in_seconds", 0))
+
+    if (last_time := timeout_check.get(call_id, None)):
+        deadline = last_time + exp_time
+
+        if curr_time > deadline:
+            print((
+                f"Callback for {call_id} was too late.\n"
+                f"Deadline: {deadline} - Current time: {curr_time} "
+                f"- Difference: {deadline - curr_time} seconds"
+            ))
+        else:
+            print(f"Callback {call_id} within {deadline - curr_time} seconds of deadline")
+
+    timeout_check[call_id] = curr_time
+
 
     if grant_type not in ("client_credentials","refresh_token"):
         raise HTTPException(400, "unsupported grant_type")

@@ -29,7 +29,11 @@ async def initial_call(
         sc: ScheduledCallback, c: CallbackConfig, url: str, client_id: str
     ):
 
-    headers = {"Content-Type": "application/json"}
+    headers = { 
+        "Content-Type": "application/json",
+        "id" : str(sc.config.id),
+        "expires_in_seconds" : str(sc.config.expires_in_seconds)
+    }
     body = f'''
     {{
         "grant_type": "client_credentials",

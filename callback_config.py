@@ -21,6 +21,7 @@ class CallbackConfig(BaseModel):
     customer_alias : str
     instance_alias : str
     expires_in_ticks: int
+    wait_time_in_ticks: int
 
     class Config:
         from_attributes = True 

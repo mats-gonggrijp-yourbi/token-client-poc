@@ -33,9 +33,14 @@ class ScheduledCallback:
 
     async def callback(self) -> None:
         async with httpx.AsyncClient() as client:
+            # Add id for testing 
+            headers = self.config.headers
+            headers["id"] = str(self.config.id)
+            headers["expires_in_seconds"] = str(self.config.expires_in_seconds)
+
             response = await client.post(
                 url=self.config.url,
-                headers=self.config.headers,
+                headers=headers,
                 content=self.config.body
             )
 
