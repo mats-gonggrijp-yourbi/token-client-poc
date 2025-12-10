@@ -10,18 +10,24 @@ class TimeWheel:
         while True:
             sc = await self.queue.get()
             try:
+                t = sc.scheduled_tick
                 await sc.callback()
                 sc.scheduled_tick = self.add(sc, sc.scheduled_tick)
                 print((
-                    f"Scheduled for tick {sc.scheduled_tick}"
-                    f"with deadline: {sc.config.expires_in_ticks}"
+                    f"ID: {sc.config.id} "
+                    f"\nat current: {t}"
+                    f"\n scheduled for: {sc.scheduled_tick}"
+                    f"\nwith expiry: {sc.config.expires_in_ticks}"
+                    f"\nand scale: {sc.config.scale}"
                 ))
             finally:
                 self.queue.task_done()
 
-
-    def __init__(self, config: TimeWheelConfig):
-        assert config.tick_safety_margin >= 0
+    def __init__(
+            self,
+            config: TimeWheelConfig,
+            expected_callbacks: set[int]
+        ):
         assert config.tick_safety_margin >= 0
         assert config.num_workers > 0
 
@@ -40,26 +46,36 @@ class TimeWheel:
         for _ in range(config.num_workers):
             self.tasks.append(create_task(self.worker()))
 
+        self.expected_callbacks = expected_callbacks
+        self.received_callbacks: set[int] = set()
+
 
     def add(self, sc: ScheduledCallback, current_tick: int):
         """Add a new item to the first available slot with least occupancy."""
         assert current_tick < self.size
-        assert sc.config.expires_in_ticks < self.size
+        assert sc.config.expires_in_ticks - self.tick_safety_margin <= self.size
         assert sc.config.expires_in_ticks > self.tick_safety_margin
 
         # Compute the upper boundary for the slot range
         max_offset  = sc.config.expires_in_ticks - self.tick_safety_margin
-        assert max_offset > sc.config.wait_time_in_ticks 
+
+        # Keep track of the callback ID's that have been processed by this wheel
+        self.received_callbacks.add(sc.config.id)
+
+        # Always wait atleast 1 tick to execute the next callback
+        wait_ticks = (
+            sc.config.wait_time_in_ticks if sc.config.wait_time_in_ticks > 0 else 1
+        )
 
         # Compute the slot range withing the upper and lower boundaries
         allowed = [
-            (current_tick + i) % self.size 
-            for i in range(sc.config.wait_time_in_ticks, max_offset + 1)
+            (current_tick + i) % self.size for i in range(wait_ticks, max_offset + 1)
         ]
 
         # Find the left-most minimally occupied slot within that range
         optimal = min(allowed, key=lambda t: (len(self.slots[t]), t))
         self.slots[optimal].add(sc)
+
 
         return optimal
 
@@ -94,4 +110,12 @@ class TimeWheel:
 
             # Increment ticks; wrap around when t > size
             t = (t + 1) %  self.size
+
+            # At every rotation check if we've completed all callbacks
+            if t == (self.size - 1):
+                print("current t", t, "final t", self.size -1)
+                print("expected callback", self.expected_callbacks)
+                print("received callbacks", self.received_callbacks)
+                assert self.expected_callbacks == self.received_callbacks
+                self.received_callbacks.clear()
 

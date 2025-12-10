@@ -12,7 +12,7 @@ async def main():
 
     # Create timewheel instances
     for c in load_timewheel_configs_from_database().values():
-        wheel = TimeWheel(c)
+        wheel = TimeWheel(c, set())
         timewheels[wheel.scale] = wheel
 
     print(f"Initialized {len(timewheels)} timewheels.")
@@ -20,9 +20,14 @@ async def main():
     # Schedule initial callbacks
     for c in load_callback_configs_from_database():
         sc = ScheduledCallback(c)
-        sc.scheduled_tick = timewheels[sc.config.scale].add(sc, 0)
+        wheel = timewheels[sc.config.scale]
+        wheel.expected_callbacks.add(c.id)
+        sc.scheduled_tick = wheel.add(sc, 0)
         await initial_call(sc, c, sc.config.url, sc.config.instance_alias)
 
+    for w in timewheels.values():
+        print(w.expected_callbacks)
+    
     # Run all tick loops concurrently
     tasks = [
         asyncio.create_task(w.tick_loop())

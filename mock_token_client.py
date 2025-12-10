@@ -4,12 +4,24 @@ import secrets, time
 from typing import Any
 from starlette.datastructures import FormData
 import asyncio
+import psycopg
+from math import inf
 
 app = FastAPI()
 refresh_store: dict[str, dict[Any, Any]] = {}
-timeout_check: dict[str, float] = {}
 
-RESPONSE_TIME = 0.08
+CONN_STRING = "postgresql://postgres:postgres@localhost:5432/postgres"
+with psycopg.connect(CONN_STRING) as conn:
+    with conn.cursor() as cur:
+        cur.execute("SELECT id FROM auth.config")
+        rows = cur.fetchall()
+        ids = {next(iter(r)) for r in rows}
+
+timeout_check: dict[str, float] = {str(i) : inf for i in ids}
+late_calls: list[str] = []
+print("Timeout check ", timeout_check)
+
+RESPONSE_TIME = 0.0
 
 def parse_body(data: dict[Any, Any] | FormData) -> dict[Any, Any]:
     if isinstance(data, dict):
@@ -35,23 +47,17 @@ async def token(req: Request):
     if not call_id:
         raise HTTPException(500)
 
+    # Check if this call is within the deadline
     curr_time = time.monotonic()
     exp_time = int(req.headers.get("expires_in_seconds", 0))
-
-    if (last_time := timeout_check.get(call_id, None)):
-        deadline = last_time + exp_time
-
-        if curr_time > deadline:
-            print((
-                f"Callback for {call_id} was too late.\n"
-                f"Deadline: {deadline} - Current time: {curr_time} "
-                f"- Difference: {deadline - curr_time} seconds"
-            ))
-        else:
-            print(f"Callback {call_id} within {deadline - curr_time} seconds of deadline")
-
+    deadline = timeout_check[call_id] + exp_time
+    if curr_time > deadline:
+        late_calls.append(call_id)
+    else:
+        print(f"Callback {call_id} within {deadline - curr_time} seconds of deadline")
     timeout_check[call_id] = curr_time
 
+    assert late_calls == [], "Some callbacks missed their deadline"
 
     if grant_type not in ("client_credentials","refresh_token"):
         raise HTTPException(400, "unsupported grant_type")
