@@ -70,9 +70,6 @@ def load_callback_configs_from_database():
             for row in rows
         ]
 
-        for c in configs:
-            print(c.model_dump_json(indent=2), '\n\n')
-
     return configs
 
 

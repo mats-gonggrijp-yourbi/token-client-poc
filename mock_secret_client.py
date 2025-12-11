@@ -1,10 +1,6 @@
 import asyncio
 
-# Typical azure keyvault response times
-RESPONSE_TIME = 0.0
-
-# TO DO: when wait time on external services is too large it breaks everything 
-#   -> need safe margins and failure mitigation tactics
+RESPONSE_TIME = 0.1
 
 class MockSecretClient:
     def __init__(self) -> None:

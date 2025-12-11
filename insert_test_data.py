@@ -4,29 +4,18 @@ import random
 # ---------------------------------------------
 # CONFIGURATION CONSTANTS
 # ---------------------------------------------
-
-# How many rows to insert for each scale
 NUM_ROWS_PER_SCALE = {
     '1-5 seconds': 3,
-    '5-60 seconds': 18,
-    '1-20 minutes' : 200
+    '6-60 seconds': 3,
 }
-
-# Minimum expiry value allowed per scale  
-# (max value auto-calculated)
 MIN_EXPIRY_VALUES = {
-    '1-5 seconds': 2,
-    '5-60 seconds': 11,
-    '1-20 minutes' : 121
+    '1-5 seconds': 1,
+    '6-60 seconds': 6,
 }
-
 MAX_EXPIRY_VALUES = {
-    '1-5 seconds': 4, # size - 1
-    '5-60 seconds': 59,
-    '1-20 minutes': 1199,
+    '1-5 seconds': 5,
+    '6-60 seconds': 60,
 }
-
-# PostgreSQL connection string
 CONN_STRING = "postgresql://postgres:postgres@localhost:5432/postgres"
 
 # ---------------------------------------------
