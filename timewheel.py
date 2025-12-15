@@ -1,27 +1,7 @@
 import asyncio
-# from dataclasses import dataclass
-# from typing import Callable, Awaitable, Any
 import math
 from scheduled_callback import ScheduledCallback
 
-# @dataclass
-# class Action:
-#     """
-#     Class to hold the timewheel actions.
-
-#     Actions are defined as cyclical and should be executed 1x per deadline.
-    
-#     Properties:
-#     - `deadline` [float] = time in seconds between each execution
-#     - `fn` [Callable] = an awaitable function
-#     - `due_tick` [int] = a tick index value for a timewheel slot
-#     - `cancelled` [bool] = whether or not the action is cancelled
-        
-#     """
-#     deadline: float
-#     fn: Callable[[], Awaitable[Any]]
-#     due_tick: int = 0
-#     cancelled: bool = False
 
 class TimeWheel:
     """
@@ -164,29 +144,11 @@ class TimeWheel:
         try:
             if action.due_tick <= self.current_tick:
                 await action.callback()
+                print((
+                    f"Executed {action.due_tick}\n"
+                    f"with deadline {action.config.expires_in_seconds}\n"
+                    f"at current tick {self.current_tick}\n"
+                ))
         finally:
             if not action.cancelled:
                 self.schedule(action)
-
-# if __name__ == "__main__":
-#     stop = asyncio.Event()
-
-#     async def main():
-#         from random import randint
-
-#         async def foo():
-#             await asyncio.sleep(0.05)
-#             print("hey")
-
-#         actions = [ScheduledCallback(float(randint(5, 30)), foo) for _ in range(10)]
-#         actions.append(ScheduledCallback(5.0, foo))
-#         # list(map(print, [a.deadline for a in actions]))
-
-#         wheel = TimeWheel(base_tick=1.0, wheels=3, slots=5)
-#         list(map(wheel.schedule, actions))
-
-#         wheel.start()
-#         await stop.wait()
-
-#     asyncio.run(main())
-

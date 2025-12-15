@@ -1,72 +1,91 @@
-import psycopg
+# type: ignore
 import random
+import string
+import psycopg
 
-# ---------------------------------------------
-# CONFIGURATION CONSTANTS
-# ---------------------------------------------
-NUM_ROWS_PER_SCALE = {
-    '1-5 seconds': 3,
-    '6-60 seconds': 3,
+# =========================
+# Configuration
+# =========================
+DB_CONFIG = { # type: ignore
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "postgres",
+    "user": "postgres",
+    "password": "postgres",
 }
-MIN_EXPIRY_VALUES = {
-    '1-5 seconds': 1,
-    '6-60 seconds': 6,
-}
-MAX_EXPIRY_VALUES = {
-    '1-5 seconds': 5,
-    '6-60 seconds': 60,
-}
-CONN_STRING = "postgresql://postgres:postgres@localhost:5432/postgres"
 
-# ---------------------------------------------
-# MAIN INSERT LOGIC
-# ---------------------------------------------
-def insert_test_data():
-    with psycopg.connect(CONN_STRING) as conn:
+ROWS_TO_INSERT = 5          
+EXPIRES_MIN = 5             
+EXPIRES_MAX = 30            
+
+# =========================
+# Helpers
+# =========================
+def random_string(length: int = 5) -> str:
+    return "".join(random.choices(string.ascii_letters + string.digits, k=length))
+
+
+def random_json_array_string() -> str:
+    # produces e.g. ["Ab3Xy"]
+    return f'["{random_string()}"]'
+
+
+# =========================
+# Insert logic
+# =========================
+def insert_test_rows():
+    sql = """
+        INSERT INTO auth.config (
+            url,
+            headers,
+            body,
+            expires_in_seconds,
+            module_alias,
+            system_alias,
+            customer_alias,
+            instance_alias,
+            refresh_token_keys,
+            access_token_keys
+        )
+        VALUES (
+            %(url)s,
+            %(headers)s,
+            %(body)s,
+            %(expires_in_seconds)s,
+            %(module_alias)s,
+            %(system_alias)s,
+            %(customer_alias)s,
+            %(instance_alias)s,
+            %(refresh_token_keys)s,
+            %(access_token_keys)s
+        );
+    """
+
+    rows = []
+    for _ in range(ROWS_TO_INSERT):
+        rows.append( # type: ignore
+            {
+                "url": "http://127.0.0.1:8000/token",
+                "headers": '{"Content-Type": "application/x-www-form-urlencoded", "Authorization": "Bearer ..."}',
+                "body": "grant_type=refresh_token&refresh_token=NULL",
+                "expires_in_seconds": random.randint(EXPIRES_MIN, EXPIRES_MAX),
+                "module_alias": random_string(),
+                "system_alias": random_string(),
+                "customer_alias": random_string(),
+                "instance_alias": random_string(),
+                "refresh_token_keys": random_json_array_string(),
+                "access_token_keys": random_json_array_string(),
+            }
+        )
+
+    with psycopg.connect(**DB_CONFIG) as conn: 
         with conn.cursor() as cur:
-            for scale, num_rows in NUM_ROWS_PER_SCALE.items():
-                min_expiry = MIN_EXPIRY_VALUES[scale]
-                max_expiry = MAX_EXPIRY_VALUES[scale]
-
-                print(f"Inserting {num_rows} entries for scale '{scale}' with range {min_expiry}-{max_expiry}s")
-
-                for i in range(num_rows):
-                    expires = random.randint(min_expiry, max_expiry)
-
-                    url = "http://127.0.0.1:8000/token"
-                    headers = '{"Content-Type": "application/x-www-form-urlencoded", "Authorization": "Bearer ..."}'
-                    body = "grant_type=refresh_token&refresh_token=..."
-
-                    module_alias = "pos"
-                    system_alias = "coolsystem"
-                    customer_alias = f"random-customer-{scale.replace(' ', '').replace('-', '')}-{i}"
-                    instance_alias = f"random-instance-{scale.replace(' ', '').replace('-', '')}-{i}"
-
-                    cur.execute(
-                        """
-                        INSERT INTO auth.config 
-                        (url, headers, body, expires_in_seconds, time_wheel_scale, 
-                         module_alias, system_alias, customer_alias, instance_alias, wait_time_in_seconds)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0)
-                        """,
-                        (
-                            url,
-                            headers,
-                            body,
-                            expires,
-                            scale,
-                            module_alias,
-                            system_alias,
-                            customer_alias,
-                            instance_alias
-                        )
-                    )
+            cur.executemany(sql, rows)
 
         conn.commit()
-        print("\n✔ Done inserting test data!\n")
 
-# ---------------------------------------------
-# RUN SCRIPT
-# ---------------------------------------------
+    print(f"Inserted {ROWS_TO_INSERT} rows into auth.config")
+
+
 if __name__ == "__main__":
-    insert_test_data()
+    insert_test_rows()

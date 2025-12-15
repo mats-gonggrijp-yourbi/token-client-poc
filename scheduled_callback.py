@@ -1,10 +1,16 @@
 import httpx
 from callback_config import CallbackConfig
-# from secret_client_wrapper import SecretClientWrapper
 from urllib.parse import parse_qsl, urlencode
 from typing import Any
 import json
-from mock_secret_client import MockSecretClient
+from azure.keyvault.secrets.aio import SecretClient
+from azure.identity.aio import DefaultAzureCredential
+
+def create_secret_strings(config: CallbackConfig):
+    prefix = f"{config.module_alias}-{config.system_alias}-{config.instance_alias}"
+    access_secret = f"{prefix}-access-token"
+    refresh_secret = f"{prefix}-refresh-token"
+    return access_secret, refresh_secret
 
 def update_urlencoded(data: str, key: str, value: Any):
     d = dict(parse_qsl(data))
@@ -16,12 +22,21 @@ def update_json(data: str, key: str, value: Any):
     d[key] = value
     return json.dumps(d)
 
+def get_nested_value(data: dict[Any, Any], keys: list[Any]) -> Any:
+    d = data
+    for k in keys:
+        d = d[k]
+    return d
+
 class ScheduledCallback:
     def __init__(
         self, config: CallbackConfig
     ):
         self.config = config
-        self.secret_client = MockSecretClient()
+        self.secret_client = SecretClient(
+            f"https://ybi{config.customer_alias}-kv.vault.azure.net/",
+            credential=DefaultAzureCredential()
+        )
         self.due_tick = 0
         self.cancelled = False
 
@@ -42,15 +57,18 @@ class ScheduledCallback:
             )
 
             if response:
-                data = response.json()
-                rt = data["refresh_token"]
+                data: dict[Any, Any] = response.json()
+                rt = get_nested_value(data, self.config.refresh_token_keys)
+                at = get_nested_value(data, self.config.access_token_keys)
 
                 # Update in-memory refresh token
                 self.config.body = self.update_fn(
                     self.config.body, "refresh_token", rt
                 )
-                await self.secret_client.set_secret("RefreshToken", data["refresh_token"])
-                await self.secret_client.set_secret("AccessToken", data["access_token"])
+
+                acc_str, ref_str = create_secret_strings(self.config)
+                await self.secret_client.set_secret(ref_str, rt)
+                await self.secret_client.set_secret(acc_str, at)
 
             return None            
 

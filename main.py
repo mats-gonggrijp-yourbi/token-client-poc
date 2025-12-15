@@ -1,5 +1,5 @@
 import asyncio
-from scheduled_callback import ScheduledCallback
+from scheduled_callback import ScheduledCallback, create_secret_strings
 from load_callback_configs import load_callback_configs
 from timewheel import TimeWheel
 import psycopg
@@ -19,14 +19,16 @@ if __name__ == "__main__":
         callbacks = [ScheduledCallback(c) for c in load_callback_configs(conn)]
         
         for c in callbacks:
-            refresh_token = await c.secret_client.get_secret("refresh_token")
+            config = c.config
+            _, refresh_secret = create_secret_strings(config)
+            refresh_token = await c.secret_client.get_secret(refresh_secret)
             if not refresh_token:
                 print(f"[!! WARNING !!] Missing refresh token for: {c.config}\n")
-                continue
+                raise RuntimeError(f"Missing refresh tokens for: {c.config}")
             c.config.body = c.update_fn(c.config.body, "refresh_token", refresh_token)
             print(c.config.body)
 
-        wheel = TimeWheel(base_tick=1.0, wheels=3, slots=5)
+        wheel = TimeWheel(base_tick=1.0, wheels=6, slots=10)
         list(map(wheel.schedule, callbacks))
         wheel.start()
         await stop.wait()
