@@ -1,12 +1,10 @@
 import httpx
-# from  httpx import Response
 from callback_config import CallbackConfig
 # from secret_client_wrapper import SecretClientWrapper
 from urllib.parse import parse_qsl, urlencode
 from typing import Any
 import json
 from mock_secret_client import MockSecretClient
-from math import inf
 
 def update_urlencoded(data: str, key: str, value: Any):
     d = dict(parse_qsl(data))
@@ -20,13 +18,12 @@ def update_json(data: str, key: str, value: Any):
 
 class ScheduledCallback:
     def __init__(
-        self, config: CallbackConfig, scheduled_tick: int = 0
+        self, config: CallbackConfig
     ):
         self.config = config
-        self.scheduled_tick = scheduled_tick
         self.secret_client = MockSecretClient()
-        self.last_abs_execution_tick = 0
-        self.next_abs_deadline_tick = inf
+        self.due_tick = 0
+        self.cancelled = False
 
         ctype = self.config.headers["Content-Type"]
         if ctype == "application/x-www-form-urlencoded":
@@ -36,7 +33,6 @@ class ScheduledCallback:
 
     async def callback(self) -> None:
         async with httpx.AsyncClient() as client:
-            # Add id for testing 
             headers = self.config.headers.copy()
 
             response = await client.post(

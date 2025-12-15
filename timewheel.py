@@ -1,181 +1,192 @@
-from typing import Any
-from time import monotonic
-from asyncio import Queue, sleep, create_task, Task
+import asyncio
+# from dataclasses import dataclass
+# from typing import Callable, Awaitable, Any
+import math
 from scheduled_callback import ScheduledCallback
-from timewheel_config import TimeWheelConfig
 
+# @dataclass
+# class Action:
+#     """
+#     Class to hold the timewheel actions.
+
+#     Actions are defined as cyclical and should be executed 1x per deadline.
+    
+#     Properties:
+#     - `deadline` [float] = time in seconds between each execution
+#     - `fn` [Callable] = an awaitable function
+#     - `due_tick` [int] = a tick index value for a timewheel slot
+#     - `cancelled` [bool] = whether or not the action is cancelled
+        
+#     """
+#     deadline: float
+#     fn: Callable[[], Awaitable[Any]]
+#     due_tick: int = 0
+#     cancelled: bool = False
 
 class TimeWheel:
+    """
+    A class that implements a hierarchical timewheel datastructure
     
-    def reschedule(self, sc: ScheduledCallback, executed_abs_tick: int) -> int:
-        """
-        Reschedule SC based on actual execution tick, preserving deadline guarantees.
-        """
-        current_cyclical_tick = executed_abs_tick % self.size
-        return self.add(sc, current_cyclical_tick)
+    Holds methods for running the tick loop and scheduling actions based on deadlines
 
+    Holds actions at different levels of time-granularity
+    (i.e. seconds, minutes, hours, etc.) and executes them based on their remaining time
 
-    async def worker(self):
-        while True:
-            sc = await self.queue.get()
-            try:
-                cb_id = sc.config.id
-                expires = sc.config.expires_in_ticks
-                margin = self.tick_safety_margin
+    Actions that are far away get put into course slots and gradually cascade down to
+    the lowest level where they are executed
 
-                current_abs = self.current_abs_tick
-                current_cyc = current_abs % self.size
+    Actions get automatically rescheduled immediately after execution unless cancelled
+    """
+    def __init__(self, base_tick: float = 0.1, wheels: int = 4, slots: int = 256):
+        # The global tick rate in seconds
+        self.base_tick = base_tick
+        # The number of slots per wheel (level)
+        self.slots = slots
+        # The number of levels (wheels) in the hierarchy
+        self.levels = wheels
+        self.current_tick = 0
 
-                # ---- PRE-EXECUTION DEBUG ---------------------------------------
-                print(
-                    "\n"
-                    "========== CALLBACK EXECUTION START ==========\n"
-                    f"Callback ID:              {cb_id}\n"
-                    f"Current ABS tick:         {current_abs}\n"
-                    f"Current cyclical tick:    {current_cyc}\n"
-                    f"Last execution ABS tick:  {getattr(sc, 'last_abs_execution_tick', 'N/A')}\n"
-                    f"Previous deadline ABS:    {getattr(sc, 'next_abs_deadline_tick', 'N/A')}\n"
-                    "------------------------------------------------"
-                )
-
-                # ---- DEADLINE CHECK --------------------------------------------
-                deadline = sc.next_abs_deadline_tick
-                late_threshold = deadline - margin
-
-                if current_abs > late_threshold:
-                    print(
-                        f"!!! DEADLINE MISS DETECTED !!!\n"
-                        f"  Current ABS tick:       {current_abs}\n"
-                        f"  Deadline ABS tick:      {deadline}\n"
-                        f"  Safety margin:          {margin}\n"
-                        f"  Late threshold:         {late_threshold}\n"
-                        f"  → Callback executed TOO LATE\n"
-                    )
-                else:
-                    print(
-                        "Deadline check:            OK\n"
-                        f"  Current ABS tick:       {current_abs}\n"
-                        f"  Latest allowed tick:    {late_threshold}\n"
-                    )
-
-                # ---- MARK EXECUTION TICK ---------------------------------------
-                sc.last_abs_execution_tick = current_abs
-
-                # ---- COMPUTE NEXT DEADLINE -------------------------------------
-                sc.next_abs_deadline_tick = current_abs + expires
-                print(
-                    "Next deadline computed:\n"
-                    f"  Expires in ticks:       {expires}\n"
-                    f"  Next deadline ABS:      {sc.next_abs_deadline_tick}\n"
-                )
-
-                # ---- EXECUTE ---------------------------------------------------
-                print("Executing callback...")
-                await sc.callback()
-                print("Callback execution:        DONE\n")
-
-                # ---- RESCHEDULING ----------------------------------------------
-                new_tick = self.reschedule(sc, current_abs)
-                sc.scheduled_tick = new_tick
-
-                print(
-                    "Rescheduling completed:\n"
-                    f"  Rescheduled cyc tick:   {new_tick}\n"
-                    f"  Reschedule ABS base:    {current_abs}\n"
-                    "========== CALLBACK EXECUTION END ==========\n"
-                )
-
-            finally:
-                self.queue.task_done()
-
-
-    def __init__(
-            self,
-            config: TimeWheelConfig,
-            expected_callbacks: set[int]
-        ):
-        assert config.tick_safety_margin >= 0
-        assert config.num_workers > 0
-
-        # Config
-        self.size = config.size
-        self.seconds_per_tick = config.seconds_per_tick
-        self.scale = config.scale
-        self.tick_safety_margin = config.tick_safety_margin
-        self.num_workers = config.num_workers
-
-        # Data
-        self.slots: list[set[ScheduledCallback]] = [set() for _ in range(config.size)]
-        self.queue: Queue[ScheduledCallback] = Queue()
-        self.tasks: list[Task[Any]] = []
-
-        # Async workers
-        for _ in range(config.num_workers):
-            self.tasks.append(create_task(self.worker()))
-
-        # Callback tracking for checking correctness
-        self.expected_callbacks = expected_callbacks
-        self.received_callbacks: set[int] = set()
-
-        # Keep track of absolute tick values to prevent time drift on slow workers
-        self.current_abs_tick = 0
-
-
-    def add(self, sc: ScheduledCallback, current_tick: int):
-        """Add a new item to the first available slot with least occupancy."""
-        assert current_tick < self.size
-        assert sc.config.expires_in_ticks - self.tick_safety_margin <= self.size
-        assert sc.config.expires_in_ticks > self.tick_safety_margin
-
-        # Compute the upper boundary for the slot range
-        max_offset  = sc.config.expires_in_ticks - self.tick_safety_margin
-        assert max_offset < self.size
-
-        # Keep track of the callback ID's that have been processed by this wheel
-        self.received_callbacks.add(sc.config.id)
-
-        # Always wait atleast 1 tick to execute the next callback
-        wait_ticks = (
-            sc.config.wait_time_in_ticks if sc.config.wait_time_in_ticks > 0 else 1
-        )
-        assert wait_ticks < max_offset + 1
-
-        # Compute the slot range within the upper and lower boundaries
-        allowed = [
-            (current_tick + i) % self.size for i in range(wait_ticks, max_offset + 1)
+        # Each wheel is a list of slots, each slot contains multiple actions
+        self.wheels: list[list[list[ScheduledCallback]]] = [
+            [[] for _ in range(slots)] for _ in range(wheels)
         ]
+        self.running = False
+        self._task = None
 
-        # Find the left-most minimally occupied slot within that range
-        optimal = min(allowed, key=lambda t: (len(self.slots[t]), t))
-        self.slots[optimal].add(sc)
+    def start(self):
+        """Start running the tick loop"""
+        if self.running:
+            return
+        self.running = True
+        self._task = asyncio.create_task(self._loop())
 
-        return optimal
+    def stop(self):
+        """ Stop running the tick loop"""
+        self.running = False
+        if self._task:
+            self._task.cancel()
 
+    async def _loop(self):
+        """Increment current tick by one per tick rate and call self._advance()"""
+        try:
+            while self.running:
+                await asyncio.sleep(self.base_tick)
+                self.current_tick += 1
+                print(f"\n--tick {self.current_tick}--")
+                self._advance()
+        finally:
+            self.running = False
 
-    async def tick_loop(self):
-        t = 0
-        # Initial compute of the clock time for the next integer tick value
-        next_tick_time = monotonic() + self.seconds_per_tick
+    def schedule(self, action: ScheduledCallback):
+        """Compute the due tick based on the deadline and add the action"""
+        # Compute how many ticks untill the deadline— never run earlier than deadline
+        ticks = max(1, math.ceil(action.config.expires_in_seconds / self.base_tick))
 
-        while True:
-            print(f'\n--[TIMEWHEEL {self.scale}] tick {t} ({t * self.seconds_per_tick} seconds)-----')
+        # Add the action to the wheel with that deadline in ticks
+        action.due_tick = self.current_tick + ticks
 
-            # Queue all tasks in the current slot
-            for sc in self.slots[t]:
-                sc.scheduled_tick = t
-                await self.queue.put(sc)
-            self.slots[t].clear()
+        self._add(action)
 
-            # Compute the clock time for the next integer tick value
-            next_tick_time += self.seconds_per_tick
-            await sleep(max(0, next_tick_time - monotonic()))
+    def cancel(self, action: ScheduledCallback):
+        """ Cancel the action """
+        action.cancelled = True
 
-            # Increment ticks; wrap around when t > size
-            self.current_abs_tick += 1
-            t = self.current_abs_tick % self.size
+    def _add(self, action: ScheduledCallback):
+        """
+        Puts actions into buckets at level and index based on time left untill due
 
-            # At every rotation check if we've completed all callbacks
-            # if t == (self.size - 1):
-                # assert self.expected_callbacks == self.received_callbacks
-                # self.received_callbacks.clear()
+        Actions with less time left get put into lower level buckets
+
+        If the action is scheduled for the current tick or earlier (missed deadline),
+        place it in level 0 slot 0 for immediate execution.
+        """
+        # Compute how much ticks are left until the action is due
+        diff = action.due_tick - self.current_tick
+
+        # Execute now
+        if diff <= 0:
+            self.wheels[0][0].append(action)
+            return 
+
+        # Compute the total maximum range in ticks over all levels and slots
+        max_range = self.slots ** self.levels
+
+        # If the time left is greater than the wheels range, cap it at size - 1
+        if diff >= max_range:
+            diff = max_range - 1
+            action.due_tick = self.current_tick + diff
+
+        # Go through all levels and check if the ticks left are within the scale
+        for level in range(self.levels):
+            # If ticks left is within the level's scale boundary we add it to that level
+            if diff < self.slots ** (level + 1):
+                # span = num(ticks) / slot
+                span: int = self.slots ** level
+                # int(floor(due/span)) % size
+                idx = (action.due_tick // span) % self.slots
+                self.wheels[level][idx].append(action)
+                break
+
+    def _advance(self):
+        """
+        Advance the wheel by executing tasks at level 0 or re-adding at higher levels
+        
+        Actions in higher levels cascade down when ticks pass slot boundaries in levels
+        """
+        for level in reversed(range(self.levels)):
+            span = self.slots ** level
+            if self.current_tick % span != 0:
+                continue
+
+            idx: int = (self.current_tick // span) % self.slots
+            bucket = self.wheels[level][idx]
+            if not bucket:
+                continue
+
+            self.wheels[level][idx] = []
+
+            if level == 0:
+                for action in bucket:
+                    if action.cancelled:
+                        continue
+                    if action.due_tick <= self.current_tick:
+                        asyncio.create_task(self._exec(action))
+                    else:
+                        self._add(action)
+            else:
+                for action in bucket:
+                    if action.cancelled:
+                        continue
+                    self._add(action)
+
+    async def _exec(self, action: ScheduledCallback):
+        """ Execute and reschedule the action """
+        try:
+            if action.due_tick <= self.current_tick:
+                await action.callback()
+        finally:
+            if not action.cancelled:
+                self.schedule(action)
+
+# if __name__ == "__main__":
+#     stop = asyncio.Event()
+
+#     async def main():
+#         from random import randint
+
+#         async def foo():
+#             await asyncio.sleep(0.05)
+#             print("hey")
+
+#         actions = [ScheduledCallback(float(randint(5, 30)), foo) for _ in range(10)]
+#         actions.append(ScheduledCallback(5.0, foo))
+#         # list(map(print, [a.deadline for a in actions]))
+
+#         wheel = TimeWheel(base_tick=1.0, wheels=3, slots=5)
+#         list(map(wheel.schedule, actions))
+
+#         wheel.start()
+#         await stop.wait()
+
+#     asyncio.run(main())
 

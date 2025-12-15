@@ -1,43 +1,34 @@
 import asyncio
 from scheduled_callback import ScheduledCallback
-from load_callback_config import (
-    load_callback_configs_from_database,
-    load_timewheel_configs_from_database
-)
+from load_callback_configs import load_callback_configs
 from timewheel import TimeWheel
-from init_call import initial_call
-
-async def main():
-    timewheels: dict[str, TimeWheel] = {}
-
-    # Create timewheel instances
-    for c in load_timewheel_configs_from_database().values():
-        wheel = TimeWheel(c, set())
-        timewheels[wheel.scale] = wheel
-
-    print(f"Initialized {len(timewheels)} timewheels.")
-
-    # Schedule initial callbacks
-    for c in load_callback_configs_from_database():
-        sc = ScheduledCallback(c)
-        wheel = timewheels[sc.config.scale]
-        wheel.expected_callbacks.add(c.id)
-        sc.scheduled_tick = wheel.add(sc, 0)
-        await initial_call(sc, c, sc.config.url, sc.config.instance_alias)
-
-    for w in timewheels.values():
-        print(w.expected_callbacks)
-    
-    # Run all tick loops concurrently
-    tasks = [
-        asyncio.create_task(w.tick_loop())
-        for w in timewheels.values()
-    ]
-
-    # TO DO: double check each timewheel coupled worker only executed 
-    # it's own scope-based callbacks 
-
-    await asyncio.gather(*tasks)
+import psycopg
+import os
 
 if __name__ == "__main__":
+    stop = asyncio.Event()
+
+    database_string = (
+        f"postgresql://{os.getenv("POSTGRES_USER")}"
+        f":{os.getenv("POSTGRES_PASSWORD")}"
+        "@localhost:5432/postgres"
+    )
+
+    async def main():
+        conn = psycopg.connect(database_string)
+        callbacks = [ScheduledCallback(c) for c in load_callback_configs(conn)]
+        
+        for c in callbacks:
+            refresh_token = await c.secret_client.get_secret("refresh_token")
+            if not refresh_token:
+                print(f"[!! WARNING !!] Missing refresh token for: {c.config}\n")
+                continue
+            c.config.body = c.update_fn(c.config.body, "refresh_token", refresh_token)
+            print(c.config.body)
+
+        wheel = TimeWheel(base_tick=1.0, wheels=3, slots=5)
+        list(map(wheel.schedule, callbacks))
+        wheel.start()
+        await stop.wait()
+
     asyncio.run(main())
