@@ -57,13 +57,8 @@ async def token(req: Request):
         return JSONResponse(issue_tokens(owner))
 
     if grant_type == "refresh_token":
-        # r = body_dict.get("refresh_token")
-        # if r not in refresh_store:
-        #     print("invalid refresh_token")
-        #     raise HTTPException(400)
-        # info = refresh_store.pop(r)
-        # if time.time() > info["access_exp"]:
-        #     print(f"refresh used after expiry by {info['owner']}")
+        r = body_dict.get("refresh_token")
+        print(f"received token: {r}")
         return JSONResponse(issue_tokens("dummy owner"))
 
 @app.get("/")

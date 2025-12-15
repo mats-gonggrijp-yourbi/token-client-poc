@@ -62,13 +62,12 @@ class ScheduledCallback:
                 at = get_nested_value(data, self.config.access_token_keys)
 
                 # Update in-memory refresh token
-                self.config.body = self.update_fn(
-                    self.config.body, "refresh_token", rt
-                )
+                self.config.body = self.update_fn(self.config.body, "refresh_token", rt)
 
                 acc_str, ref_str = create_secret_strings(self.config)
-                await self.secret_client.set_secret(ref_str, rt)
-                await self.secret_client.set_secret(acc_str, at)
+                await self.secret_client.set_secret(name=ref_str, value=rt)
+                await self.secret_client.set_secret(name=acc_str, value=at)
+                print("Updated keyvault secrets..")
 
             return None            
 
