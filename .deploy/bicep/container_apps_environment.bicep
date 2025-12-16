@@ -13,7 +13,7 @@ param environment string
 
 // Creation of Container App Environment resource.
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-10-02-preview' = {
-  name: 'cae-${stackName}-${environment}-${resourceGroup().location}'
+  name: 'cae-${stackName}-${environment}-weu'
   location: resourceGroup().location
   properties: {
     appLogsConfiguration: {

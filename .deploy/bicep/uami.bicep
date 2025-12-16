@@ -9,29 +9,28 @@ param environment string
 // User Assigned Managed Identity (UAMI) for GitHub.
 resource githubIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   location: resourceGroup().location
-  name: 'uami-${projectName}-github-${environment}'
+  name: 'id-${projectName}-gith-${environment}-weu'
 }
 
-// Federated credential for GitHub repo `webhook-client`.
-// The access is bound by the environment.
-// This means that `main` repo can only push to development etc.
+// Federated credential for GitHub repo `token-client`
+// The access is bound by the environment
+// This means that `main` repo can only push to development etc
 resource githubFederatedCredential 'Microsoft.ManagedIdentity/userAssignedIdentities/federatedIdentityCredentials@2024-11-30' = {
-  name: 'fed-${projectName}-${resourceGroup().location}'
+  name: 'fed-${projectName}-weu'
   parent: githubIdentity
   properties: {
     issuer: 'https://token.actions.githubusercontent.com'
-    subject: 'repo:Your-BI/webhook-client:environment:${environment}'
+    subject: 'repo:Your-BI/token-client:environment:${environment}'
     audiences: [
       'api://AzureADTokenExchange'
     ]
   }
 }
 
-// Creation of User-Assigned Managed Identity (UAMI) for both apps.
-// This UAMI is provisioned explicitly before to avoid dependency cycles.
+
 resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   location: resourceGroup().location
-  name: 'uami-${projectName}-server-${environment}'
+  name: 'id-${projectName}-server-${environment}-weu'
 }
 
 // These outputs are used for GitHub Actions secrets.

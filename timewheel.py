@@ -1,7 +1,8 @@
 import asyncio
 import math
 from scheduled_callback import ScheduledCallback
-
+from time import monotonic
+from datetime import datetime 
 
 class TimeWheel:
     """
@@ -32,6 +33,8 @@ class TimeWheel:
         ]
         self.running = False
         self._task = None
+        self.last_executed = 0.0
+        self.monotonic = 0.0
 
     def start(self):
         """Start running the tick loop"""
@@ -50,9 +53,13 @@ class TimeWheel:
         """Increment current tick by one per tick rate and call self._advance()"""
         try:
             while self.running:
-                await asyncio.sleep(self.base_tick)
-                self.current_tick += 1
+                next_tick_time = monotonic() + self.base_tick
                 self._advance()
+                await asyncio.sleep(max(0, next_tick_time - monotonic()))
+                self.current_tick += 1
+                if self.current_tick % 15 == 0:
+                    print(f"--time: {datetime.now().strftime("%H:%M:%S")} | tick: {self.current_tick}--")
+
         finally:
             self.running = False
 
@@ -63,6 +70,8 @@ class TimeWheel:
 
         # Add the action to the wheel with that deadline in ticks
         action.due_tick = self.current_tick + ticks
+
+        print(f"Scheduled new callback for tick {action.due_tick}")
 
         self._add(action)
 
@@ -143,11 +152,14 @@ class TimeWheel:
         try:
             if action.due_tick <= self.current_tick:
                 await action.callback()
-                print((
-                    f"Executed for due tick: {action.due_tick}\n"
-                    f"Deadline in seconds: {action.config.expires_in_seconds}\n"
-                    f"Current tick: {self.current_tick}\n"
-                ))
+
+                current_time = monotonic()
+                if current_time > (self.last_executed + action.config.expires_in_seconds + 5.0):
+                    print("!! Execution more than 5 seconds past monotonic deadline !!\n")
+                self.last_executed = current_time
+
+                print(f"Executed for due tick: {action.due_tick} at current tick: {self.current_tick}")
+
         finally:
             if not action.cancelled:
                 self.schedule(action)

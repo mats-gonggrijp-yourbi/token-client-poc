@@ -32,8 +32,6 @@ async def main():
     list(map(wheel.schedule, callbacks))
     print(f"Scheduled {len(callbacks)} for timewheel")
 
-    exit()
-
     # Start the time wheel loop
     print("Starting wheel loop")
     wheel.start()

@@ -9,7 +9,7 @@ param environment string
 
 // Azure Container Registry resource.
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' = {
-  name: 'cr${projectName}${environment}${resourceGroup().location}'
+  name: 'cr${projectName}${environment}weu'
   location: resourceGroup().location
   sku: {
     name: 'Basic'

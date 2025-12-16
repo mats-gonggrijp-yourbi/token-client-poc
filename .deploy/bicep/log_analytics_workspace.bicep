@@ -1,8 +1,8 @@
 param stackName string
 param environment string
 
-var logAnalyticsWorkspaceName = 'log-${stackName}-${environment}-${resourceGroup().location}'
-var appInsightsName = 'appi-${stackName}-${environment}-${resourceGroup().location}'
+var logAnalyticsWorkspaceName = 'log-${stackName}-${environment}-weu'
+var appInsightsName = 'appi-${stackName}-${environment}-weu'
 
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {

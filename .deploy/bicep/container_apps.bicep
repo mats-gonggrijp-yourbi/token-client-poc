@@ -16,7 +16,7 @@ param gitHubIdentityId string
 param imageName string = 'token-client:latest'
 
 resource serverUami 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectName}-serv-${environment}-${resourceGroup().location}'
+  name: 'id-${projectName}-serv-${environment}-weu'
 }
 
 // Creation of server resource.
@@ -29,7 +29,7 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
   }
   kind: 'containerapps'
   location: resourceGroup().location
-  name: 'ca-${projectName}-server-${environment}-${resourceGroup().location}'
+  name: 'ca-${projectName}-server-${environment}-weu'
   properties: {
     configuration: {
       secrets: []
@@ -73,7 +73,7 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
           ]
           image: '${containerRegistryLoginServer}/${imageName}'
           imageType: 'ContainerImage'
-          name: 'ca-${projectName}-server-${environment}-${resourceGroup().location}'
+          name: 'ca-${projectName}-server-${environment}-weu'
           probes: []
           resources: {
             cpu: json('1.0')

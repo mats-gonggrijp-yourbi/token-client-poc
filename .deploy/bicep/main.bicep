@@ -7,17 +7,17 @@ param environment string
 
 // Get the existing id references
 resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectName}-server-${environment}${resourceGroup().location}'
+  name: 'id-${projectName}-server-${environment}weu'
 }
 
 
 resource gitHubIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectName}-github-${environment}-${resourceGroup().location}'
+  name: 'id-${projectName}-github-${environment}-weu'
 }
 
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' existing = {
-  name: 'cr${projectName}${environment}${resourceGroup().location}'
+  name: 'cr${projectName}${environment}weu'
 }
 
 // Creates Log Analytics Workspace.

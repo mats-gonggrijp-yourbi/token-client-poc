@@ -1,20 +1,16 @@
-@description('Abbreviated name of stack')
-param stackName string
-@description('Specifies the deployment environment')
+param projectName string
 @allowed([
-  'development'
-  'staging'
-  'production'
+  'stg'
+  'prd'
 ])
 param environment string
 
+
+// Get the server (token client) identity
 resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'uami-${stackName}-server-${environment}'
+  name: 'id-${projectName}-server-${environment}-weu'
 }
 
-resource processorIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'uami-${stackName}-processor-${environment}'
-}
 
 var acrRoleIdPull = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -23,7 +19,7 @@ var acrRoleIdPull = subscriptionResourceId(
 
 // Reference to existing Container Registry which is created by deployment script.
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' existing = {
-  name: 'cr${stackName}${environment}'
+  name: 'cr${projectName}${environment}weu'
 }
 
 resource serverAcrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -35,16 +31,6 @@ resource serverAcrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
-// Assign processor to Acr with `pull` role.
-resource processorAcrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(resourceGroup().id, processorIdentity.id, acrRoleIdPull)
-  scope: containerRegistry
-  properties: {
-    principalId: processorIdentity.properties.principalId
-    roleDefinitionId: acrRoleIdPull
-  }
-}
-
 // Built-in AcrPush role definition
 var acrRoleIdPush = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
@@ -52,12 +38,12 @@ var acrRoleIdPush = subscriptionResourceId(
 )
 
 
-// Reference to existing UAMI of GitHub.
+// Get the github identity
 resource gitHubIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'uami-${stackName}-github-${environment}'
+  name: 'id-${projectName}-gith-${environment}-weu'
 }
 
-// Assign AcrPush role to Github Actions UAMI
+// Assign it AcrPush 
 resource acrPushAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(containerRegistry.id, gitHubIdentity.id, 'AcrPushUAMI')
   scope: containerRegistry
