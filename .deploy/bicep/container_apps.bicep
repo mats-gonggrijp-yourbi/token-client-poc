@@ -37,8 +37,8 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
       identitySettings: []
       ingress: {
         allowInsecure: false
-        external: true
-        targetPort: 8000
+        external: false
+        targetPort: 8080
         traffic: [
           {
             latestRevision: true

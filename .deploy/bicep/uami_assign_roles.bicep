@@ -11,7 +11,6 @@ resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-1
   name: 'id-${projectName}-server-${environment}-weu'
 }
 
-
 var acrRoleIdPull = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '7f951dda-4ed3-4680-a7ca-43fe172d538d'
