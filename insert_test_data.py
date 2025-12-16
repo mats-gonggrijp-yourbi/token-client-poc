@@ -14,9 +14,9 @@ DB_CONFIG = { # type: ignore
     "password": "postgres",
 }
 
-ROWS_TO_INSERT = 5          
-EXPIRES_MIN = 5             
-EXPIRES_MAX = 30            
+ROWS_TO_INSERT = 200          
+EXPIRES_MIN = 15             
+EXPIRES_MAX = 300
 
 # =========================
 # Helpers
@@ -73,8 +73,8 @@ def insert_test_rows():
                 "system_alias": random_string(),
                 "customer_alias": random_string(),
                 "instance_alias": random_string(),
-                "refresh_token_keys": random_json_array_string(),
-                "access_token_keys": random_json_array_string(),
+                "refresh_token_keys": '["refresh_token"]',
+                "access_token_keys": '["access_token"]',
             }
         )
 

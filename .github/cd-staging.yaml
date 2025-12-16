@@ -1,0 +1,164 @@
+name: cd-staging
+
+on:
+  push:
+    # When something gets into main this will trigger
+    # Will always be through a pull request because main is protected
+    branches: [ main ]
+    paths:
+      - 'app/processor/**'
+      - 'app/server/**'
+  # This allows for manual execution to force a update
+  workflow_dispatch:
+    inputs:
+      force_aca:
+        description: 'Force ACA Update'
+        required: false
+        default: 'true'
+
+concurrency:
+  # Group is tied to environment
+  # Multiple simultaneous runs will be queued
+  group: staging
+  cancel-in-progress: false
+
+run-name: cd - staging by @${{ github.actor }}
+
+jobs:
+  # Used to decide which stack to deploy
+  stacks:
+    runs-on: ubuntu-latest
+    environment: staging
+
+    permissions:
+      contents: read
+
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      skip_deploy: ${{ steps.build.outputs.skip_deploy }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      # This checks if there are changes in the stack
+      # This allows to only deploy if there are changes
+      # It makes the default CD more efficient
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            processor:
+              - 'app/processor/src/**'
+            server:
+              - 'app/server/src/**'
+
+      # Based on the previous step, the matrix is decided
+      # If the matrix is empty, deployment is skipped
+      - name: Build matrix from changes
+        id: build
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            arr=('"processor"' '"server"')
+          else
+            arr=()
+            [[ "${{ steps.changes.outputs.processor }}" == 'true' ]] && arr+=('"processor"')
+            [[ "${{ steps.changes.outputs.server }}" == 'true' ]] && arr+=('"server"')
+          fi
+
+          if [[ "${#arr[@]}" -eq 0 ]]; then
+            echo "skip_deploy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_deploy=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          json=$(printf '%s\n' "${arr[@]}" | jq -R . | jq -s -c .)
+          echo "matrix=${json}" >> "$GITHUB_OUTPUT"
+  
+  # Used to deploy the stacks in a matrix
+  deploy:
+    needs: stacks
+    if: ${{ needs.stacks.outputs.skip_deploy != 'true' }} 
+    runs-on: ubuntu-latest
+    environment: staging
+
+    permissions:
+      id-token: write
+      contents: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        stack: ${{ fromJSON(needs.stacks.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Log into Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR Login
+        run: az acr login --name "crwcstaging"
+
+      - name: Resolve stack metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${{ matrix.stack }}" in
+            processor) APP_PATH=app/processor; APP_BASENAME=wc-processor; CA_PREFIX=caj; CA_TYPE="job"; ;;
+            server)  APP_PATH=app/server;  APP_BASENAME=wc-server; CA_PREFIX=ca; CA_TYPE=""; ;;
+          esac
+
+          APP_NAME="${APP_BASENAME}-staging"
+          IMAGE_REPO="crwcstaging.azurecr.io/${APP_BASENAME}"
+
+          {
+            echo "APP_PATH=$APP_PATH"
+            echo "APP_NAME=$APP_NAME"
+            echo "IMAGE_REPO=$IMAGE_REPO"
+            echo "CA_PREFIX=$CA_PREFIX"
+            echo "CA_TYPE=$CA_TYPE"
+          } >> "$GITHUB_ENV"
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PK_READ_YOURBI_SDK_FOR_PYTHON_FOR_WEBHOOK_CLIENT }}
+
+      - name: Check access to YourBI SDK for Python
+        run: |
+          GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=yes" \
+          git ls-remote git@github.com:Your-BI/yourbi-sdk-for-python.git
+
+      # DIGEST captures the build digest which is needed to ensure `az update` always
+      # creates a new revision
+      - name: Build & Push Docker Image
+        working-directory: ${{ env.APP_PATH }}
+        run: |
+          docker build --ssh default -f Dockerfile -t "${IMAGE_REPO}:latest" .
+          docker push "${IMAGE_REPO}:latest"
+          DIGEST=$(docker push "${IMAGE_REPO}:latest" | tee /dev/stderr | awk '/digest:/ {print $3}')
+          echo "IMAGE_REF=${IMAGE_REPO}@${DIGEST}" >> "$GITHUB_ENV"
+          
+      - name: Force ACA update
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.force_aca == 'true' }}
+        shell: bash
+        run: |
+          az containerapp ${CA_TYPE:+$CA_TYPE }update \
+            --name "${CA_PREFIX}-${APP_NAME}" \
+            --resource-group "ybi-webhook-client-staging" \
+            --image "${IMAGE_REF}"

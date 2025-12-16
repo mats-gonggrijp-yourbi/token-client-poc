@@ -52,7 +52,6 @@ class TimeWheel:
             while self.running:
                 await asyncio.sleep(self.base_tick)
                 self.current_tick += 1
-                print(f"\n--tick {self.current_tick}--")
                 self._advance()
         finally:
             self.running = False
@@ -145,9 +144,9 @@ class TimeWheel:
             if action.due_tick <= self.current_tick:
                 await action.callback()
                 print((
-                    f"Executed {action.due_tick}\n"
-                    f"with deadline {action.config.expires_in_seconds}\n"
-                    f"at current tick {self.current_tick}\n"
+                    f"Executed for due tick: {action.due_tick}\n"
+                    f"Deadline in seconds: {action.config.expires_in_seconds}\n"
+                    f"Current tick: {self.current_tick}\n"
                 ))
         finally:
             if not action.cancelled:

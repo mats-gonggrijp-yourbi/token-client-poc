@@ -12,23 +12,30 @@ async def main():
     # Update every callback with the refresh tokens from the keyvault
     for c in callbacks:
         config = c.config
+        print(f"Loading callback: {config.model_dump_json(indent=2)}\n")
         _, refresh_secret = create_secret_strings(config)
+        print(f"refresh secret name: {refresh_secret}\n")
         refresh_token = await c.secret_client.get_secret(refresh_secret)
+        print(f"received refresh token from keyvault: {refresh_secret}\n")
         if not refresh_token.value:
             raise RuntimeError(f"Missing refresh tokens for: {c.config}")
         
         c.config.body = c.update_fn(
             c.config.body, "refresh_token", refresh_token.value
         )
-        print(c.config.body)
+        print(f"updated request body: {c.config.body}")
 
     # Initialize a time wheel
-    wheel = TimeWheel(base_tick=1.0, wheels=6, slots=10)
+    wheel = TimeWheel(base_tick=1.0, wheels=3, slots=10)
 
     # Schedule all callbacks
     list(map(wheel.schedule, callbacks))
+    print(f"Scheduled {len(callbacks)} for timewheel")
+
+    exit()
 
     # Start the time wheel loop
+    print("Starting wheel loop")
     wheel.start()
 
     # Loop untill stop is set to true
