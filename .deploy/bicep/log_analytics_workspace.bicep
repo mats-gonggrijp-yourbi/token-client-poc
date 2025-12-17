@@ -1,8 +1,8 @@
-param stackName string
-param environment string
+param projectAlias string
+param environmentAlias string
 
-var logAnalyticsWorkspaceName = 'log-${stackName}-${environment}-weu'
-var appInsightsName = 'appi-${stackName}-${environment}-weu'
+var logAnalyticsWorkspaceName = 'log-${projectAlias}-${environmentAlias}-weu'
+var appInsightsName = 'appi-${projectAlias}-${environmentAlias}-weu'
 
 
 resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -19,7 +19,7 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09
   }
 }
 
-// App Insights for Container Apps Environment.
+
 resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   name: appInsightsName
   location: resourceGroup().location
@@ -32,4 +32,4 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 
 output name string = logAnalyticsWorkspace.name
 output customerId string = logAnalyticsWorkspace.properties.customerId
-// output primarySharedKey string = logAnalyticsWorkspace.listKeys().primarySharedKey
+

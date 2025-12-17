@@ -81,10 +81,10 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-
   }
   tags: {
     project_name: projectAlias
-    environment: environmentAlias
-    region: 'swedencentral'
+    environmentAlias: environmentAlias
+    region: 'West Europe'
     owner_email: 'mats.gonggrijp@yourbi.nl'
     project_service: 'backend'
-    repo_url: 'https://github.com/Your-BI/customer-portal'
+    repo_url: 'https://github.com/Your-BI/token-client'
   }
 }

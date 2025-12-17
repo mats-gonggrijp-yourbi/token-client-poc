@@ -1,15 +1,15 @@
-// Variables
-param projectName string
+
+param projectAlias string
 @allowed([
   'development'
   'staging'
   'production'
 ])
-param environment string
+param environmentAlias string
 
-// Azure Container Registry resource.
+
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' = {
-  name: 'cr${projectName}${environment}weu'
+  name: 'cr${projectAlias}${environmentAlias}weu'
   location: resourceGroup().location
   sku: {
     name: 'Basic'

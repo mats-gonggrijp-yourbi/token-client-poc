@@ -14,7 +14,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-10-01' = {
   name: vnetName
   tags: {
     project_name: projectAlias
-    environment: environmentAlias
+    environmentAlias: environmentAlias
     region: resourceGroup().location
     owner_email: 'mats.gonggrijp@yourbi.nl'
     project_service: 'back'

@@ -1,35 +1,31 @@
-// Parameters
-param projectName string
+
+param projectAlias string
 param containerAppEnvironmentId string
 param containerRegistryLoginServer string
-param serverIdentityId string
 @allowed([
   'stg'
   'prd'
 ])
-param environment string
+param environmentAlias string
 param githubIdentityPrincipalId string
 param gitHubIdentityId string
 
-// {resource_alias}-{project_alias}-{project_service_alias}-{environment_alias}-{region_alias}-{ybi_key}-{instance_number
+
 
 param imageName string = 'token-client:latest'
 
 resource serverUami 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectName}-serv-${environment}-weu'
+  name: 'id-${projectAlias}-serv-${environmentAlias}-weu'
 }
 
-// Creation of server resource.
+
 resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
   identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${serverIdentityId}': {}
-    }
+    type: 'SystemAssigned'
   }
   kind: 'containerapps'
   location: resourceGroup().location
-  name: 'ca-${projectName}-server-${environment}-weu'
+  name: 'ca-${projectAlias}-server-${environmentAlias}-weu'
   properties: {
     configuration: {
       secrets: []
@@ -48,10 +44,10 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
         transport: 'Auto'
       }
       maxInactiveRevisions: 100
+      
       registries: [
         {
-          server: containerRegistryLoginServer
-          identity: serverIdentityId
+          server: containerRegistryLoginServer 
         }
       ]
     }
@@ -63,7 +59,7 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
           env: [
             {
               name: 'ENVIRONMENT'
-              value: environment
+              value: environmentAlias
             }
             {
               name: 'AZURE_CLIENT_ID'
@@ -73,7 +69,7 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
           ]
           image: '${containerRegistryLoginServer}/${imageName}'
           imageType: 'ContainerImage'
-          name: 'ca-${projectName}-server-${environment}-weu'
+          name: 'ca-${projectAlias}-server-${environmentAlias}-weu'
           probes: []
           resources: {
             cpu: json('1.0')
@@ -93,14 +89,14 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
   }
 }
 
-// server contributor role.
+
 var serverContributorRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '358470bc-b998-42bd-ab17-a7e34c199c0f'
 )
 
-// Contributor role assignment for GitHub UAMI to server.
-// This is needed to force a refresh on the server.
+
+
 resource gitHubServerContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(server.id, gitHubIdentityId, serverContributorRoleId)
   scope: server

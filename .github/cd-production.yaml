@@ -6,8 +6,7 @@ on:
     # Will always be through a pull request because main is protected
     branches: [ main ]
     paths:
-      - 'app/processor/**'
-      - 'app/server/**'
+      - 'app/**'
   # This allows for manual execution to force a update
   workflow_dispatch:
     inputs:
@@ -28,7 +27,7 @@ jobs:
   # Used to decide which stack to deploy
   stacks:
     runs-on: ubuntu-latest
-    environment: production
+    environment: production # prd ?
 
     permissions:
       contents: read
@@ -52,10 +51,8 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            processor:
-              - 'app/processor/src/**'
             server:
-              - 'app/server/src/**'
+              - 'app/**'
 
       # Based on the previous step, the matrix is decided
       # If the matrix is empty, deployment is skipped
@@ -111,7 +108,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: ACR Login
-        run: az acr login --name "crwcproduction"
+        run: az acr login --name "crtcprdweu"
 
       - name: Resolve stack metadata
         id: meta

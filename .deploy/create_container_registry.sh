@@ -13,5 +13,5 @@ ENVIRONMENT="$1"
 az deployment group create \
   --resource-group "ybi-webhook-client-$ENVIRONMENT" \
   --template-file "./bicep/container_registry.bicep" \
-  --parameters stackName="wc" environment="$ENVIRONMENT" \
+  --parameters projectAlias="wc" environment="$ENVIRONMENT" \
   --debug

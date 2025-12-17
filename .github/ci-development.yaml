@@ -6,8 +6,7 @@ on:
     # Will always be through a pull request because main is protected
     branches: [ main ]
     paths:
-      - 'app/processor/src/**'
-      - 'app/server/src/**'
+      - 'app/**'
 
 run-name: >-
   ci – ${{ github.head_ref }} by @${{ github.actor }} 
@@ -39,10 +38,8 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            processor:
-              - 'app/processor/src/**'
             server:
-              - 'app/server/src/**'
+              - 'app/**'
 
       # Based on the previous step, the matrix is decided
       # If the matrix is empty, deployment is skipped
@@ -83,7 +80,7 @@ jobs:
       - name: Setup single environment with uv
         uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.13"
+          python-version: "3.14"
           enable-cache: true
 
       - name: Symlink uv to local path

@@ -15,5 +15,5 @@ echo ENVIRONMENT
 az deployment group create \
   --resource-group "ybi-webhook-client-$ENVIRONMENT" \
   --template-file "./bicep/uami.bicep" \
-  --parameters stackName="wc" environment="$ENVIRONMENT" \
+  --parameters projectAlias="wc" environment="$ENVIRONMENT" \
   --debug

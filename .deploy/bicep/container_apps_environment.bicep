@@ -1,4 +1,3 @@
-// Variables
 param projectAlias string
 param logAnalyticsCustomerId string
 param logAnalyticsWorkspaceName string
@@ -20,10 +19,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' existing = {
   name: 'vnet-${projectAlias}-${environmentAlias}-weu'
 }
 
-@description('Name of environment')
-param environment string
-
-resource acaSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' = {
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' = {
   name: acaSubnetName
   parent: vnet
   properties: {
@@ -39,9 +35,8 @@ resource acaSubnet 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' = {
   }
 }
 
-// Creation of Container App Environment resource.
 resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-10-02-preview' = {
-  name: 'cae-${projectAlias}-${environment}-weu'
+  name: 'cae-${projectAlias}-${environmentAlias}-weu'
   location: resourceGroup().location
   properties: {
     appLogsConfiguration: {
@@ -53,7 +48,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-10-02-p
     }
     zoneRedundant: false
     vnetConfiguration: {
-      infrastructureSubnetId: acaSubnet.id
+      infrastructureSubnetId: subnet.id
     }
   }
 }

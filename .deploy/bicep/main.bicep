@@ -1,51 +1,46 @@
-param projectName string = 'tc'  // token client
+param projectAlias string = 'tc'  
 @allowed([
   'stg'
   'prd'
 ])
-param environment string
-
-// Get the existing id references
-resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectName}-server-${environment}weu'
-}
-
+param environmentAlias string
+param containerAppsAddressPrefix string
 
 resource gitHubIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectName}-github-${environment}-weu'
+  name: 'id-${projectAlias}-github-${environmentAlias}-weu'
 }
 
 
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' existing = {
-  name: 'cr${projectName}${environment}weu'
+  name: 'cr${projectAlias}${environmentAlias}weu'
 }
 
-// Creates Log Analytics Workspace.
+
 module logAnalyticsWorkspace 'log_analytics_workspace.bicep' = {
   params: {
-    environment: environment
-    stackName: projectName
+    environmentAlias: environmentAlias
+    projectAlias: projectAlias
   }
 }
 
-// Creates Container Apps Environment required for Container Apps.
+
 module containerAppsEnvironment 'container_apps_environment.bicep' = {
   params: {
-    environment: environment
+    environmentAlias: environmentAlias
     logAnalyticsCustomerId: logAnalyticsWorkspace.outputs.customerId
     logAnalyticsWorkspaceName: logAnalyticsWorkspace.outputs.name
-    stackName: projectName
+    projectAlias: projectAlias
+    addressPrefix: containerAppsAddressPrefix
   }
 }
 
-// Creates Container Apps server and processor.
+
 module containerApps 'container_apps.bicep' = {
   params: {
-    projectName: projectName
+    projectAlias: projectAlias
     containerAppEnvironmentId: containerAppsEnvironment.outputs.id
     containerRegistryLoginServer: containerRegistry.properties.loginServer
-    environment: environment
-    serverIdentityId: serverIdentity.id
+    environmentAlias: environmentAlias
     gitHubIdentityId: gitHubIdentity.id
     githubIdentityPrincipalId: gitHubIdentity.properties.principalId
   }
