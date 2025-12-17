@@ -11,9 +11,9 @@ addressPrefix="$2"
 
 az deployment group create \
   --debug \
-  --resource-group "rg-$PROJECT_ALIAS-$environmentAlias-$REGION_ALIAS" \
+  --resource-group "rg-tc-$environmentAlias-weu" \
   --template-file "./bicep/virtual_network.bicep" \
   --parameters \
     environmentAlias="$environmentAlias" \
-    projectAlias="$PROJECT_ALIAS" \
+    projectAlias="tc" \
     addressPrefix="$addressPrefix" 

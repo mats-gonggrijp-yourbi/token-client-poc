@@ -9,7 +9,7 @@ param environmentAlias string
 param adminPassword string
 param addressPrefix string
 
-var dbName string = 'psql-${projectAlias}-back-${environmentAlias}-weu' 
+var dbName string = 'psql-${projectAlias}-${environmentAlias}-weu' 
 var subnetName string = 'snet-${projectAlias}-back-${environmentAlias}-weu' 
 var vnetName string = 'vnet-${projectAlias}-${environmentAlias}-weu'
 
@@ -41,7 +41,7 @@ resource postgresPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' e
 
 resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-preview' = {
   name: dbName
-  location: 'swedencentral'
+  location: 'westeurope'
   sku: {
     name: 'Standard_D2ds_v5'
     tier: 'GeneralPurpose'
@@ -82,7 +82,7 @@ resource postgresDatabase 'Microsoft.DBforPostgreSQL/flexibleServers@2025-01-01-
   tags: {
     project_name: projectAlias
     environmentAlias: environmentAlias
-    region: 'West Europe'
+    region: 'westeurope'
     owner_email: 'mats.gonggrijp@yourbi.nl'
     project_service: 'backend'
     repo_url: 'https://github.com/Your-BI/token-client'

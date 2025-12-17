@@ -5,8 +5,6 @@ param projectAlias string
 ])
 param environmentAlias string
 
-
-
 resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
   name: 'id-${projectAlias}-server-${environmentAlias}-weu'
 }

@@ -1,9 +1,8 @@
 
 param projectAlias string
 @allowed([
-  'development'
-  'staging'
-  'production'
+  'stg'
+  'prd'
 ])
 param environmentAlias string
 

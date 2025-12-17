@@ -18,7 +18,7 @@ az deployment group create \
   --resource-group "ybi-webhook-client-$ENVIRONMENT" \
   --template-file "./bicep/main.bicep" \
   --parameters \
-    projectAlias="wc" \
+    projectAlias="tc" \
     environment="$ENVIRONMENT" \
     githubAccessToken="$GITHUB_ACCESS_TOKEN" \
     adminKey="$ADMIN_KEY" \

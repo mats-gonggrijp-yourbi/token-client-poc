@@ -10,11 +10,9 @@ resource gitHubIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-1
   name: 'id-${projectAlias}-github-${environmentAlias}-weu'
 }
 
-
 resource containerRegistry 'Microsoft.ContainerRegistry/registries@2024-11-01-preview' existing = {
   name: 'cr${projectAlias}${environmentAlias}weu'
 }
-
 
 module logAnalyticsWorkspace 'log_analytics_workspace.bicep' = {
   params: {

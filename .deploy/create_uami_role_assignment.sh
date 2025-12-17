@@ -11,7 +11,7 @@ ENVIRONMENT="$1"
 
 # Run deployment
 az deployment group create \
-  --resource-group "ybi-webhook-client-$ENVIRONMENT" \
+  --resource-group "rg-tc-$ENVIRONMENT-weu" \
   --template-file "./bicep/uami_assign_roles.bicep" \
-  --parameters projectAlias="wc" environment="$ENVIRONMENT" \
+  --parameters projectAlias="tc" environmentAlias="$ENVIRONMENT" \
   --debug
