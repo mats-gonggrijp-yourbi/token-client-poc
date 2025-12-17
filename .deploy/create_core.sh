@@ -1,29 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -lt 4 ]; then
-  echo "Usage: $0 <ENVIRONMENT> <GITHUB_ACCESS_TOKEN> <ADMIN_KEY> <SQL_CATALOG_PASSWORD>"
+if [ $# -lt 5 ]; then
+  echo "Usage: $0 <ENVIRONMENT> <POSTGRES_PASSWORD> <POSTGRES_URL> <ADDRESS_PREFIX> <IMAGE_NAME>"
   exit 1
 fi
 
 ENVIRONMENT="$1"
-GITHUB_ACCESS_TOKEN="$2"
-ADMIN_KEY="$3"
-SQL_CATALOG_PASSWORD="$4"
+POSTGRES_PASSWORD="$2"
+POSTGRES_URL="$3"
+ADDRESS_PREFIX="$4"
+IMAGE_NAME="$5"
 
 echo "Deploying environment: $ENVIRONMENT"
 
 # Run deployment
 az deployment group create \
-  --resource-group "ybi-webhook-client-$ENVIRONMENT" \
+  --resource-group "rg-tc-$ENVIRONMENT-weu" \
   --template-file "./bicep/main.bicep" \
   --parameters \
     projectAlias="tc" \
-    environment="$ENVIRONMENT" \
-    githubAccessToken="$GITHUB_ACCESS_TOKEN" \
-    adminKey="$ADMIN_KEY" \
-    sqlCatalogPassword="$SQL_CATALOG_PASSWORD" \
-    sqlCatalogUrl="ybisql.public.cda17043cf16.database.windows.net" \
-    sqlCatalogPort="3342" \
-    sqlCatalogUsername="ybi_sql_admin" \
+    environmentAlias="$ENVIRONMENT" \
+    addressPrefix="$ADDRESS_PREFIX" \
+    postgresPassword="$POSTGRES_PASSWORD" \
+    postgresUrl="$POSTGRES_URL" \
+    postgresPort="3342" \
+    postgresUsername="ybi_postgresql_admin_$ENVIRONMENT" \
+    imageName="$IMAGE_NAME" \
   --debug

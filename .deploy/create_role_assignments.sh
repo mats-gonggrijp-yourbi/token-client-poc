@@ -12,6 +12,6 @@ ENVIRONMENT="$1"
 # Run deployment
 az deployment group create \
   --resource-group "rg-tc-$ENVIRONMENT-weu" \
-  --template-file "./bicep/uami_assign_roles.bicep" \
+  --template-file "./bicep/assign_roles.bicep" \
   --parameters projectAlias="tc" environmentAlias="$ENVIRONMENT" \
   --debug

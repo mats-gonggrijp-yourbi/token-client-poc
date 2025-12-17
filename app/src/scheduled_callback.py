@@ -1,5 +1,5 @@
 import httpx
-from callback_config import CallbackConfig
+from src.callback_config import CallbackConfig
 from urllib.parse import parse_qsl, urlencode
 from typing import Any
 import json

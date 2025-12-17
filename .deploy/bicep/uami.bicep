@@ -5,6 +5,11 @@ param projectAlias string
 ])
 param environmentAlias string
 
+resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
+  location: resourceGroup().location
+  name: 'id-${projectAlias}-server-${environmentAlias}-weu'
+}
+
 resource githubIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   location: resourceGroup().location
   name: 'id-${projectAlias}-gith-${environmentAlias}-weu'

@@ -9,26 +9,35 @@ param containerRegistryLoginServer string
 param environmentAlias string
 param githubIdentityPrincipalId string
 param gitHubIdentityId string
+param imageName string
+@secure()
+param postgresPassword string
+param postgresUsername string
+param postgresUrl string
+param postgresPort string
 
-
-
-param imageName string = 'token-client:latest'
-
-resource serverUami 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
-  name: 'id-${projectAlias}-serv-${environmentAlias}-weu'
+resource serverIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' existing = {
+  name: 'id-${projectAlias}-server-${environmentAlias}-weu'
 }
 
-
-resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
+resource server 'Microsoft.App/containerApps@2025-07-01' = {
   identity: {
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${serverIdentity.id}': {}
+    }
   }
   kind: 'containerapps'
   location: resourceGroup().location
   name: 'ca-${projectAlias}-server-${environmentAlias}-weu'
   properties: {
     configuration: {
-      secrets: []
+      secrets: [
+        {
+          name: 'postgres-password'
+          value: postgresPassword
+        }
+      ]
       activeRevisionsMode: 'Single'
       identitySettings: []
       ingress: {
@@ -48,6 +57,7 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
       registries: [
         {
           server: containerRegistryLoginServer 
+          identity: serverIdentity.id 
         }
       ]
     }
@@ -62,17 +72,27 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
               value: environmentAlias
             }
             {
-              name: 'AZURE_CLIENT_ID'
-              value: serverUami.properties.clientId
-
+              name: 'POSTGRES_PASSWORD'
+              secretRef: 'postgres-password'
+            }
+            {
+              name: 'POSTGRES_URL'
+              value: postgresUrl
+            }
+            {
+              name: 'POSTGRES_PORT'
+              value: postgresPort
+            }
+            {
+              name: 'POSTGRES_USERNAME'
+              value: postgresUsername
             }
           ]
           image: '${containerRegistryLoginServer}/${imageName}'
-          imageType: 'ContainerImage'
           name: 'ca-${projectAlias}-server-${environmentAlias}-weu'
           probes: []
           resources: {
-            cpu: json('1.0')
+            cpu: 1
             memory: '2Gi'
           }
         }
@@ -89,13 +109,10 @@ resource server 'Microsoft.App/containerApps@2024-10-02-preview' = {
   }
 }
 
-
 var serverContributorRoleId = subscriptionResourceId(
   'Microsoft.Authorization/roleDefinitions',
   '358470bc-b998-42bd-ab17-a7e34c199c0f'
 )
-
-
 
 resource gitHubServerContributorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(server.id, gitHubIdentityId, serverContributorRoleId)

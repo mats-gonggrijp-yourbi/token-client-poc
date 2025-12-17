@@ -4,6 +4,8 @@ from src.load_callback_configs import load_callback_configs
 from src.timewheel import TimeWheel
 import psycopg
 import os
+import dotenv
+dotenv.load_dotenv(".env")
 
 async def main():
     conn = psycopg.connect(database_string)

@@ -1,0 +1,5 @@
+docker tag token-client crtcstgweu.azurecr.io/token-client:latest
+
+docker push crtcstgweu.azurecr.io/token-client:latest
+
+create_vnet -> create_uami -> create_postgres -> create_core -> create_role_assignments

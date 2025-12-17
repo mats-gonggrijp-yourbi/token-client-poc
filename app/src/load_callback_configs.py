@@ -1,6 +1,6 @@
 import psycopg
 from psycopg.rows import TupleRow
-from callback_config import CallbackConfig
+from src.callback_config import CallbackConfig
 import dotenv
 
 dotenv.load_dotenv(".env")

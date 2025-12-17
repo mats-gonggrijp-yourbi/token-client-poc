@@ -9,33 +9,26 @@ param environmentAlias string
 param addressPrefix string
 var acaSubnetName string = 'sn-${projectAlias}-server-${environmentAlias}-weu'
 
-resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2025-07-01' existing = {
   name: logAnalyticsWorkspaceName
 }
 var logAnalyticsPrimarySharedKey = logAnalyticsWorkspace.listKeys().primarySharedKey
 
 
-resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' existing = {
+resource vnet 'Microsoft.Network/virtualNetworks@2025-01-01' existing = {
   name: 'vnet-${projectAlias}-${environmentAlias}-weu'
 }
 
-resource subnet 'Microsoft.Network/virtualNetworks/subnets@2023-11-01' = {
+resource subnet 'Microsoft.Network/virtualNetworks/subnets@2025-01-01' = {
   name: acaSubnetName
   parent: vnet
   properties: {
     addressPrefix: addressPrefix
-    delegations: [
-      {
-        name: 'aca-delegation'
-        properties: {
-          serviceName: 'Microsoft.Web/serverFarms'
-        }
-      }
-    ]
+    delegations: []
   }
 }
 
-resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-10-02-preview' = {
+resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2025-07-01' = {
   name: 'cae-${projectAlias}-${environmentAlias}-weu'
   location: resourceGroup().location
   properties: {
@@ -49,6 +42,7 @@ resource containerAppEnvironment 'Microsoft.App/managedEnvironments@2024-10-02-p
     zoneRedundant: false
     vnetConfiguration: {
       infrastructureSubnetId: subnet.id
+      internal: true
     }
   }
 }
