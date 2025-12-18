@@ -1,5 +1,18 @@
-docker tag token-client crtcstgweu.azurecr.io/token-client:latest
+docker tag token-client crtcprdweu.azurecr.io/token-client:latest
 
-docker push crtcstgweu.azurecr.io/token-client:latest
+docker push crtcprdweu.azurecr.io/token-client:latest
 
-create_vnet -> create_uami -> create_postgres -> create_core -> create_role_assignments
+---DEPLOYMENT SEQUENCE---
+1. create_vnet
+2. create_container_registry
+3. create_uami
+4. create_role_assignments
+5. create_postgres
+6. build and push docker image
+7. create_core
+8. add server ID to access group (production only):
+
+az ad group member add \
+  --group ybi-resource-data-access-production \
+  --member-id <user-assigned-managed-identity-principal-id>
+-------------------------
